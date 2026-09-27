@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      - run: npx vitest run
+
+      # npm run build also typechecks and runs the prebuild release gate.
+      # VITE_ORACLE=jev ships the JevOracle client; VITE_WORKER_URL is a
+      # non-secret URL baked into the bundle. The OpenRouter key never
+      # appears here — it lives only in the Worker's secrets.
+      - name: Build for Pages
+        run: npm run build
+        env:
+          VITE_ORACLE: jev
+          VITE_WORKER_URL: https://cosmic-oracle-worker.cosmic-oracle.workers.dev
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
