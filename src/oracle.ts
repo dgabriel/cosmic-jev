@@ -1,9 +1,10 @@
 /**
- * Oracle (oracle-cne): the `Oracle` interface (Call 1 classify + Call 2
- * verdict), the consequential/vague routing logic shared by every
- * implementation, and `StubOracle`, a deterministic local stand-in for the
- * real `JevOracle` (oracle-rwy, src/oracle-jev.ts -- see `createOracle`
- * below, which constructs it for `"jev"`).
+ * Oracle (oracle-cne, sensitivity routing redesigned in oracle-2au): the
+ * `Oracle` interface (Call 1 classify + Call 2 verdict), the sensitivity/
+ * vague routing logic shared by every implementation, and `StubOracle`, a
+ * deterministic local stand-in for the real `JevOracle` (oracle-rwy,
+ * src/oracle-jev.ts -- see `createOracle` below, which constructs it for
+ * `"jev"`).
  *
  * Reuses sky.ts/aspects.ts/natal.ts types rather than re-inventing chart
  * shapes: `BodyPosition`, `MoonPhaseName`, `TransitBodyName`, `TransitChart`
@@ -42,6 +43,35 @@ export type RulingBody = TransitBodyName;
 export type Noul = number;
 
 /**
+ * The sensitivity bucket a Call 1 Choice question sorts the activity into
+ * (oracle-2au), replacing the old single scalar "consequential" Noul. Each
+ * bucket has a fixed routing behavior (see `route` below):
+ * - `violence_person`: violence or harm directed at a person or animal,
+ *   INCLUDING the asker harming themselves (self-harm/suicide-adjacent
+ *   text). Always recuses. Checked with the highest priority of anything in
+ *   `route` -- nothing overrides it into a verdict.
+ * - `safety`, `legal`: always recuse, no exceptions.
+ * - `health` (everything health-related EXCEPT the violence_person/self-harm
+ *   case above -- self-harm is never merely "health"), `money`,
+ *   `relationship_ending`, `job_quitting`: proceed to a real verdict, but
+ *   flagged `disclaimer: true`.
+ * - `violence_object`: violence/destruction directed at an inanimate object
+ *   (e.g. "smash my printer"). Treated as a perfectly ordinary activity: no
+ *   recusal, no disclaimer.
+ * - `none`: not sensitive at all.
+ */
+export type SensitivityCategory =
+  | "safety"
+  | "legal"
+  | "violence_person"
+  | "health"
+  | "money"
+  | "relationship_ending"
+  | "job_quitting"
+  | "violence_object"
+  | "none";
+
+/**
  * A Score answer already normalized to [0, 1] ("cosmic intensity"), per
  * docs/jev-openrouter.md: `score / (levels - 1)`, where `score` is Jev's
  * raw 0-indexed, probability-weighted position on an N-level scale. This
@@ -51,11 +81,17 @@ export type Noul = number;
  */
 export type Intensity = number;
 
-/** Call 1's result: the activity's category (ruling body) and the two routing Nouls. */
+/**
+ * Call 1's result: the activity's category (ruling body), its sensitivity
+ * bucket, and the vague routing Noul. `vague` stays its own independent Noul
+ * (oracle-2au) -- vague-detection is orthogonal to sensitivity: an activity
+ * can be simultaneously vague and (say) health-flavored, or neither, or
+ * either alone.
+ */
 export interface ClassificationResult {
   category: RulingBody;
-  /** "Is this a consequential real-life decision?" (health, money, legal, safety, ...). */
-  consequential: Noul;
+  /** Which sensitivity bucket the activity falls into (see `SensitivityCategory`). */
+  sensitivity: SensitivityCategory;
   /** "Is this activity description too vague to categorize?" */
   vague: Noul;
 }
@@ -99,40 +135,66 @@ export interface Oracle {
 }
 
 /**
- * Routing thresholds from docs/spec.md section 2. These are a safety
- * feature (consequential decisions never get a verdict; vague ones get
- * asked to clarify instead of a guess) -- do not change them without
- * checking with the project owner first.
+ * Vague routing threshold from docs/spec.md section 2. This is a safety
+ * feature (vague activities get asked to clarify instead of a guess) -- do
+ * not change it without checking with the project owner first.
+ *
+ * The old scalar `CONSEQUENTIAL_THRESHOLD` (p >= 0.3) is retired as of
+ * oracle-2au: `route` below now switches on `SensitivityCategory` buckets
+ * instead of a single probability, per explicit user-directed policy change
+ * (overriding the prior "do not change thresholds without asking" note for
+ * that constant specifically -- `VAGUE_THRESHOLD` is unchanged).
  */
-export const CONSEQUENTIAL_THRESHOLD = 0.3;
 export const VAGUE_THRESHOLD = 0.6;
 
+/** Why a `RoutingDecision` recused -- internal-only (tests/telemetry); the user-facing message stays generic either way (see explain.ts's `RECUSAL_MESSAGE`). */
+export type RecusalReason = "violence_person" | "safety" | "legal";
+
+/** Sensitivity buckets that always recuse, no exceptions, in priority order (highest first). */
+const RECUSAL_PRIORITY: readonly RecusalReason[] = ["violence_person", "safety", "legal"];
+
+/** Sensitivity buckets that proceed to a real verdict but flagged `disclaimer: true`. */
+const DISCLAIMER_SENSITIVITIES: ReadonlySet<SensitivityCategory> = new Set([
+  "health",
+  "money",
+  "relationship_ending",
+  "job_quitting",
+]);
+
 /**
- * The routing decision derived from a Call 1 classification, per spec:
- * consequential p >= CONSEQUENTIAL_THRESHOLD wins even if vague is also
- * high (recusing is the safer failure mode for a decision that might matter
- * -- asking "could you be more specific" about whether to see a doctor is
- * not the point), otherwise vague p >= VAGUE_THRESHOLD asks for detail,
- * otherwise Call 2 proceeds under `category`.
+ * The routing decision derived from a Call 1 classification (oracle-2au),
+ * per spec section 2's priority order (highest first):
+ * `violence_person` > `safety` > `legal` > vague >= `VAGUE_THRESHOLD` >
+ * proceed. `violence_person` (which covers violence/harm toward a person or
+ * animal, including the asker's own self-harm) is checked before anything
+ * else and nothing can override it into a verdict. `proceed` carries
+ * `disclaimer: true` for `health`/`money`/`relationship_ending`/
+ * `job_quitting`, and `disclaimer: false` for `violence_object`/`none`.
  */
 export type RoutingDecision =
-  | { kind: "recusal" }
+  | { kind: "recusal"; reason: RecusalReason }
   | { kind: "needs-detail" }
-  | { kind: "proceed"; category: RulingBody };
+  | { kind: "proceed"; category: RulingBody; disclaimer: boolean };
 
 /**
  * Pure routing function (no I/O, no oracle call) so both `StubOracle` and
- * the future `JevOracle` share the exact same decision logic instead of
- * each re-implementing the threshold comparisons.
+ * `JevOracle` share the exact same decision logic instead of each
+ * re-implementing the priority order.
  */
 export function route(classification: ClassificationResult): RoutingDecision {
-  if (classification.consequential >= CONSEQUENTIAL_THRESHOLD) {
-    return { kind: "recusal" };
+  for (const reason of RECUSAL_PRIORITY) {
+    if (classification.sensitivity === reason) {
+      return { kind: "recusal", reason };
+    }
   }
   if (classification.vague >= VAGUE_THRESHOLD) {
     return { kind: "needs-detail" };
   }
-  return { kind: "proceed", category: classification.category };
+  return {
+    kind: "proceed",
+    category: classification.category,
+    disclaimer: DISCLAIMER_SENSITIVITIES.has(classification.sensitivity),
+  };
 }
 
 /**
@@ -155,6 +217,13 @@ export type OracleOutcome =
       moonPhase: MoonPhaseName;
       favor: Noul;
       intensity: Intensity;
+      /**
+       * True for the disclaimer-flagged sensitivity buckets (health, money,
+       * relationship_ending, job_quitting -- oracle-2au): the UI renders a
+       * visible disclaimer alongside the explanation for these. False for
+       * violence_object/none.
+       */
+      disclaimer: boolean;
     };
 
 /** Everything `askOracle` needs beyond the `Oracle` implementation itself. */
@@ -178,6 +247,10 @@ export async function askOracle(oracle: Oracle, context: OracleContext): Promise
   const decision = route(classification);
 
   if (decision.kind === "recusal") {
+    // `decision.reason` (violence_person/safety/legal) is intentionally
+    // dropped here: per spec, the user-facing recusal message stays generic
+    // regardless of reason (see explain.ts's RECUSAL_MESSAGE). Callers that
+    // want the reason for tests/telemetry should call `route` directly.
     return { kind: "recusal" };
   }
   if (decision.kind === "needs-detail") {
@@ -207,6 +280,7 @@ export async function askOracle(oracle: Oracle, context: OracleContext): Promise
     moonPhase,
     favor: verdictAnswer.favor,
     intensity: verdictAnswer.intensity,
+    disclaimer: decision.disclaimer,
   };
 }
 
@@ -221,7 +295,7 @@ export async function askOracle(oracle: Oracle, context: OracleContext): Promise
  * StubOracle's entire source of "randomness": a pure function of its input
  * string, so the same string always produces the same number, run to run
  * and process to process. Different "salt" suffixes (e.g. `${text}|vague`
- * vs `${text}|consequential`) are used at each call site below to get
+ * vs `${text}|favor`) are used at each call site below to get
  * independent-looking values out of the same underlying text without
  * actually being independent of it (determinism requires that).
  */
@@ -398,63 +472,48 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
 } as const;
 
 /**
- * Keywords for the "is this consequential?" Noul, transcribed from spec's
- * parenthetical: health, medication, money, legal, safety, ending a
- * relationship, quitting a job.
+ * Sensitivity-bucket keyword lists (oracle-2au), one per `SensitivityCategory`
+ * except `violence_person`/`violence_object`/`none` (handled separately
+ * below by `classifyViolence`, since those need verb+target reasoning, not
+ * a flat keyword list) -- transcribed from the old flat CONSEQUENTIAL_KEYWORDS
+ * list (oracle-cne/oracle-d4i), split by which real-life-decision category
+ * each keyword names.
  *
  * "illegal" is listed as its own entry (not left to substring-match inside
  * "legal") because `keywordRegex` below requires a *leading* word boundary:
  * "illegal" no longer matches via "legal" embedded mid-word, so it needs an
- * explicit entry to keep being recognized as consequential.
+ * explicit entry to keep being recognized.
  *
- * oracle-d4i (reviewer-flagged): `category` and `consequential` are two
- * independent Call 1 signals over the same text -- adding a keyword to
- * `CATEGORY_KEYWORDS` never makes it consequential too, and vice versa.
- * Adding "doctor" to Saturn's list (chores: a doctor's visit) without also
- * adding it here meant "Should I go to the doctor for my checkup" now
- * confidently classified as Saturn *and* scored zero on consequential (no
- * "health"/"medicat"/etc. substring), sailing straight through to a verdict
- * instead of recusing -- exactly the health-decision miss `route`'s low
- * threshold exists to prevent. "doctor", "physician", and "checkup" are
- * added here for that reason (not "appointment": too generic -- it also
- * covers non-health meetings/dates, and its own false positives are not
- * cheap the way the spec frames consequential ones as being). Every other
- * oracle-d4i keyword was rechecked for the same gap and judged not to need
- * an entry here: Saturn's "bills" reads as routine chore/administrative
- * text ("pay the bills") rather than the spec's money examples (investment,
- * loan, mortgage, savings, debt -- larger, one-off financial decisions), so
- * it stays out; Jupiter's "wager" is recreational, not the kind of money
- * decision spec's examples describe.
+ * oracle-d4i (reviewer-flagged, still true post-oracle-2au): `category` and
+ * the sensitivity keyword lists are independent Call 1 signals over the
+ * same text -- adding a keyword to `CATEGORY_KEYWORDS` never makes it
+ * sensitive too, and vice versa. Adding "doctor" to Saturn's list (chores: a
+ * doctor's visit) without also adding it to `HEALTH_KEYWORDS` meant "Should
+ * I go to the doctor for my checkup" would confidently classify as Saturn
+ * *and* score "none" on sensitivity, sailing straight through to a verdict
+ * instead of getting a disclaimer -- exactly the health-decision miss this
+ * list exists to prevent. "doctor", "physician", and "checkup" are included
+ * for that reason (not "appointment": too generic -- it also covers
+ * non-health meetings/dates). Every other oracle-d4i keyword was rechecked
+ * for the same gap and judged not to need an entry here: Saturn's "bills"
+ * reads as routine chore/administrative text ("pay the bills") rather than
+ * the spec's money examples (investment, loan, mortgage, savings, debt --
+ * larger, one-off financial decisions), so it stays out; Jupiter's "wager"
+ * is recreational, not the kind of money decision spec's examples describe.
  */
-const CONSEQUENTIAL_KEYWORDS: readonly string[] = [
-  "health",
-  "medicat",
-  "medicine",
-  "surgery",
-  "diagnos",
-  "doctor",
-  "physician",
-  "checkup",
-  "money",
-  "invest",
-  "loan",
-  "mortgage",
-  "savings",
-  "debt",
-  "legal",
-  "illegal",
-  "lawsuit",
-  "lawyer",
-  "sue",
-  "safety",
-  "dangerous",
-  "unsafe",
+const HEALTH_KEYWORDS: readonly string[] = ["health", "medicat", "medicine", "surgery", "diagnos", "doctor", "physician", "checkup"];
+const MONEY_KEYWORDS: readonly string[] = ["money", "invest", "loan", "mortgage", "savings", "debt"];
+const LEGAL_KEYWORDS: readonly string[] = ["legal", "illegal", "lawsuit", "lawyer", "sue"];
+const SAFETY_KEYWORDS: readonly string[] = ["safety", "dangerous", "unsafe"];
+const RELATIONSHIP_ENDING_KEYWORDS: readonly string[] = [
   "break up",
   "breakup",
   "divorce",
   "end our relationship",
   "end my relationship",
   "end the relationship",
+];
+const JOB_QUITTING_KEYWORDS: readonly string[] = [
   "quit my job",
   "quit her job",
   "quit his job",
@@ -462,6 +521,91 @@ const CONSEQUENTIAL_KEYWORDS: readonly string[] = [
   "quitting my job",
   "resign",
 ];
+
+/**
+ * Self-harm/suicide-adjacent phrasing (oracle-2au): checked directly (not
+ * via the generic violence-verb-plus-target heuristic below) because some of
+ * this phrasing ("end my life") names no explicit violence verb from
+ * `VIOLENCE_VERB_KEYWORDS` at all. Any match here is `violence_person`,
+ * unconditionally -- per spec, self-harm is never merely "health", and this
+ * whole bucket is the single highest-priority check in `route`.
+ *
+ * This is necessarily a best-effort literal-phrase list, not a robust
+ * self-harm detector: it will miss creative/indirect/misspelled phrasing and
+ * is not a substitute for a real safety classifier. Per spec's framing
+ * ("false alarms are cheap, misses aren't funny"), the bias throughout this
+ * module is toward over-recusing on any ambiguity, not under-recusing.
+ */
+const SELF_HARM_KEYWORDS: readonly string[] = [
+  "hurt myself",
+  "hurting myself",
+  "harm myself",
+  "harming myself",
+  "kill myself",
+  "killing myself",
+  "end my life",
+  "ending my life",
+  "suicide",
+  "self-harm",
+  "self harm",
+];
+
+/**
+ * Violence/harm verbs (oracle-2au), transcribed verbatim from the issue's
+ * instructions. Combined with a target (see `PERSON_TARGET_KEYWORDS`/
+ * `OBJECT_TARGET_KEYWORDS` below) to distinguish `violence_person` from
+ * `violence_object`.
+ *
+ * Known limitation: "break" is a very common, mostly non-violent word
+ * ("take a break", "coffee break", "break the ice", "break the news").
+ * `hasViolenceVerb` strips the specific "break up"/"breakup" phrase before
+ * matching (that phrase is `RELATIONSHIP_ENDING_KEYWORDS`'s concern, not
+ * violence), but does not attempt to exclude every other idiomatic use of
+ * "break" -- an activity like "should I break the ice with my new
+ * coworkers" will spuriously match the violence-verb check. Since no target
+ * keyword (person or object) is named either, `classifyViolence`'s ambiguous-
+ * target bias then defaults it to `violence_person`, i.e. a false-positive
+ * recusal rather than a false-negative miss. That is the intentional,
+ * spec-directed trade-off ("false alarms are cheap, misses aren't funny"),
+ * not an oversight -- but it is a real, known false-positive source worth
+ * being aware of, not a claim that this heuristic is robust.
+ */
+const VIOLENCE_VERB_KEYWORDS: readonly string[] = ["hit", "hurt", "harm", "smash", "destroy", "break", "attack", "punch", "kill"];
+
+/**
+ * Person/animal violence targets (oracle-2au), transcribed verbatim from the
+ * issue's instructions plus "somebody" as an obvious synonym of "someone".
+ * "him"/"her"/"them" are in `WHOLE_WORD_KEYWORDS` below (see that set's own
+ * comment) since as bare prefixes they collide constantly with unrelated
+ * words ("here", "hero", "herself", "theme", "himself").
+ */
+const PERSON_TARGET_KEYWORDS: readonly string[] = [
+  "person",
+  "someone",
+  "somebody",
+  "myself",
+  "him",
+  "her",
+  "them",
+  "people",
+  "friend",
+  "family member",
+  "dog",
+  "cat",
+  "animal",
+  "pet",
+  "human",
+];
+
+/**
+ * Inanimate-object violence targets (oracle-2au), transcribed verbatim from
+ * the issue's instructions ("printer, wall, phone, computer, furniture,
+ * plate, things generically") plus the singular "thing" (matches "things"
+ * too via the shared leading-boundary/no-trailing-boundary stemming, and
+ * does not collide with "something"/"anything"/"nothing"/"everything": none
+ * of those have a word boundary immediately before "thing").
+ */
+const OBJECT_TARGET_KEYWORDS: readonly string[] = ["printer", "wall", "phone", "computer", "furniture", "plate", "thing"];
 
 /**
  * Word-boundary-aware keyword matching (reviewer-flagged bug in oracle-cne
@@ -495,6 +639,15 @@ const CONSEQUENTIAL_KEYWORDS: readonly string[] = [
  * relationship dynamic, neither tech-related; "trivial" starts with
  * "trivia" (Jupiter's new games-of-chance/learning keyword) but is an
  * unrelated, very common adjective.
+ *
+ * oracle-2au added four more of the same kind for the new
+ * `PERSON_TARGET_KEYWORDS`/`OBJECT_TARGET_KEYWORDS` violence-target lists:
+ * "petition" starts with "pet"; "petty" also starts with "pet"; "category"/
+ * "catalog"/"catch"/"catastrophe" all start with "cat"; "dogma" starts with
+ * "dog". (`WHOLE_WORD_KEYWORDS` was judged a worse fit for these than for
+ * "spa"/"rest": "pet"/"cat"/"dog" all have valuable stemmed forms worth
+ * preserving -- "pets", "cats", "dogs" -- that a full word-boundary match
+ * would also block.)
  */
 const PREFIX_EXCLUDES: Readonly<Record<string, readonly string[]>> = {
   sign: ["ificant"], // "significant"
@@ -505,9 +658,28 @@ const PREFIX_EXCLUDES: Readonly<Record<string, readonly string[]>> = {
   cardio: ["log"], // "cardiology"/"cardiologist"
   code: ["ine", "pendent"], // "codeine", "codependent"
   trivia: ["l"], // "trivial"
+  pet: ["ition", "ty"], // "petition", "petty"
+  cat: ["egory", "alog", "ch", "astrophe"], // "category", "catalog", "catch", "catastrophe"
+  dog: ["ma"], // "dogma"
 };
 
-const WHOLE_WORD_KEYWORDS: ReadonlySet<string> = new Set(["spa", "rest"]);
+/**
+ * "spa"/"rest" (oracle-cne): common prefixes of several unrelated words
+ * ("space"/"spare"/"spark...", "restaurant"/"restore"/"result"/"restrict")
+ * with no valuable stemmed form worth preserving, so they require a full
+ * word match instead of a prefix match.
+ *
+ * "him"/"her"/"them" (oracle-2au, `PERSON_TARGET_KEYWORDS`): as bare
+ * leading-boundary prefixes these would constantly false-positive on
+ * extremely common unrelated words -- "here", "hero", "herb", "heritage",
+ * "herself" for "her"; "theme", "themselves", "thematic" for "them" -- so
+ * they require a full word match too. (This does mean "hurt herself"/"hurt
+ * themselves" do not match via "her"/"them" specifically, but those read as
+ * self-harm-on-someone-else's-behalf phrasing that `PERSON_TARGET_KEYWORDS`'
+ * other entries, or the ambiguous-target bias in `classifyViolence`, still
+ * catch.)
+ */
+const WHOLE_WORD_KEYWORDS: ReadonlySet<string> = new Set(["spa", "rest", "him", "her", "them"]);
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -572,28 +744,119 @@ function pickCategory(lowerText: string): { body: RulingBody; matched: boolean }
   return { body: bodyAtIndex(Math.min(index, TRANSIT_BODIES.length - 1)), matched: false };
 }
 
-/**
- * Deterministic "is this consequential?" probability: a high band (0.7-0.85)
- * when a consequential keyword is present, a low band (0.05-0.2) otherwise.
- * The jitter within each band comes from the hash, not the keyword match, so
- * two different mundane activities still get two different (both low)
- * numbers rather than an identical constant.
- */
-function classifyConsequential(lowerText: string): Noul {
-  const matched = CONSEQUENTIAL_KEYWORDS.some((keyword) => keywordRegex(keyword).test(lowerText));
-  const jitter = hashToUnitInterval(`${lowerText}|consequential-jitter`) * 0.15;
-  return matched ? clamp01(0.7 + jitter) : clamp01(0.05 + jitter);
+function matchesAny(lowerText: string, keywords: readonly string[]): boolean {
+  return keywords.some((keyword) => keywordRegex(keyword).test(lowerText));
 }
 
 /**
- * Deterministic "is this too vague?" probability: high when no category
- * keyword matched at all, or the text is very short (<= 2 words); low
- * otherwise. Jittered the same way as `classifyConsequential`.
+ * Whether any `VIOLENCE_VERB_KEYWORDS` verb is present. Strips the specific
+ * "break up"/"breakup" phrase first (see `VIOLENCE_VERB_KEYWORDS`'s comment):
+ * that phrase is `RELATIONSHIP_ENDING_KEYWORDS`'s concern, not violence, and
+ * without stripping it "should I break up with my partner" would spuriously
+ * trigger the generic "break" verb match with no named target, defaulting
+ * (via `classifyViolence`'s ambiguous-target bias) to `violence_person`
+ * instead of the correct `relationship_ending`.
  */
-function classifyVague(lowerText: string, categoryMatched: boolean): Noul {
+function hasViolenceVerb(lowerText: string): boolean {
+  const withoutBreakup = lowerText.replace(/\bbreak\s*-?\s*up\b/g, "");
+  return matchesAny(withoutBreakup, VIOLENCE_VERB_KEYWORDS);
+}
+
+/**
+ * Classifies violence/harm language into `violence_person`, `violence_object`,
+ * or `undefined` (no violence detected at all), per oracle-2au's heuristic:
+ * 1. Any `SELF_HARM_KEYWORDS` phrase -> `violence_person`, unconditionally.
+ * 2. No violence verb present -> `undefined` (not a violence case).
+ * 3. A violence verb plus a clear inanimate-object target and NO person/
+ *    animal target -> `violence_object`.
+ * 4. Otherwise (a person/animal target is named, or no target is named at
+ *    all) -> `violence_person`. This is the deliberate "bias toward
+ *    violence_person when ambiguous" the issue calls for: an unnamed or
+ *    unrecognized target defaults to the safe (recusing) bucket rather than
+ *    `violence_object`/`none`.
+ *
+ * Best-effort heuristic, not a robust classifier -- see `VIOLENCE_VERB_KEYWORDS`'s
+ * comment for a known false-positive source ("break"'s many non-violent
+ * idioms), and note this has no defense against adversarial phrasing that
+ * avoids every listed verb/target word entirely (a real limitation of any
+ * fixed keyword list).
+ */
+function classifyViolence(lowerText: string): "violence_person" | "violence_object" | undefined {
+  if (matchesAny(lowerText, SELF_HARM_KEYWORDS)) {
+    return "violence_person";
+  }
+  if (!hasViolenceVerb(lowerText)) {
+    return undefined;
+  }
+  const hasPersonTarget = matchesAny(lowerText, PERSON_TARGET_KEYWORDS);
+  const hasObjectTarget = matchesAny(lowerText, OBJECT_TARGET_KEYWORDS);
+  if (hasObjectTarget && !hasPersonTarget) {
+    return "violence_object";
+  }
+  return "violence_person";
+}
+
+/**
+ * Classifies the activity's `SensitivityCategory` (oracle-2au), checked in
+ * the same priority order `route` uses for recusal (violence_person > safety
+ * > legal), then the disclaimer buckets (health/money/relationship_ending/
+ * job_quitting -- checked in that order, but since all four carry the same
+ * `disclaimer: true` behavior, their relative order among each other has no
+ * routing consequence), then `violence_object`, then `none`. Placing
+ * `violence_object` after the disclaimer buckets (rather than checking it
+ * right alongside `violence_person`) is deliberate: per spec, only
+ * `violence_person` gets veto power over everything else -- an activity that
+ * reads as both e.g. "money" and "violence_object" (unlikely in practice, but
+ * not impossible for a keyword-based heuristic) should still get the
+ * `money` disclaimer treatment, not fall through to ordinary/no-disclaimer
+ * handling.
+ */
+function classifySensitivity(lowerText: string): SensitivityCategory {
+  const violence = classifyViolence(lowerText);
+  if (violence === "violence_person") {
+    return "violence_person";
+  }
+  if (matchesAny(lowerText, SAFETY_KEYWORDS)) return "safety";
+  if (matchesAny(lowerText, LEGAL_KEYWORDS)) return "legal";
+  if (matchesAny(lowerText, HEALTH_KEYWORDS)) return "health";
+  if (matchesAny(lowerText, MONEY_KEYWORDS)) return "money";
+  if (matchesAny(lowerText, RELATIONSHIP_ENDING_KEYWORDS)) return "relationship_ending";
+  if (matchesAny(lowerText, JOB_QUITTING_KEYWORDS)) return "job_quitting";
+  if (violence === "violence_object") return "violence_object";
+  return "none";
+}
+
+/**
+ * Deterministic "is this too vague?" probability: high when the text is very
+ * short (<= 2 words), or when nothing recognizable matched at all -- no
+ * category keyword AND `sensitivity === "none"`; low otherwise. Jittered the
+ * same way as the rest of this module's Nouls (see `hashToUnitInterval`).
+ *
+ * The `sensitivity === "none"` clause (oracle-2au): a text that cleanly
+ * matched a sensitivity bucket ("Should I take out a mortgage on a new
+ * house") is self-evidently a specific, real question -- the stub's narrow
+ * category keyword lists simply don't cover it, so keying vagueness off
+ * `categoryMatched` alone would re-create the oracle-d4i bug class (keyword-
+ * list gaps silently becoming false "too vague" needs-detail outcomes) for
+ * exactly the disclaimer-bucket questions that must proceed to a verdict
+ * per spec. A matched sensitivity bucket is therefore also treated as
+ * evidence of specificity. This cannot undermine safety: the recusal buckets
+ * (violence_person/safety/legal) are checked in `route` BEFORE vague, so a
+ * recusing text never reaches the vague check regardless of what this
+ * function returns (a one-word "suicide" similarly recuses before the
+ * wordCount override can matter).
+ *
+ * The <= 2-word override deliberately stays independent of sensitivity: a
+ * bare one-word text like "money" should still be asked to clarify rather
+ * than confidently answered.
+ */
+function classifyVague(lowerText: string, categoryMatched: boolean, sensitivity: SensitivityCategory): Noul {
   const wordCount = lowerText.split(/\s+/).filter((word) => word.length > 0).length;
   const jitter = hashToUnitInterval(`${lowerText}|vague-jitter`) * 0.15;
-  if (!categoryMatched || wordCount <= 2) {
+  if (wordCount <= 2) {
+    return clamp01(0.75 + jitter);
+  }
+  if (!categoryMatched && sensitivity === "none") {
     return clamp01(0.75 + jitter);
   }
   return clamp01(0.1 + jitter);
@@ -603,10 +866,11 @@ function classifyVague(lowerText: string, categoryMatched: boolean): Noul {
 function stubClassify(activityText: string): ClassificationResult {
   const lowerText = activityText.trim().toLowerCase();
   const { body: category, matched } = pickCategory(lowerText);
+  const sensitivity = classifySensitivity(lowerText);
   return {
     category,
-    consequential: classifyConsequential(lowerText),
-    vague: classifyVague(lowerText, matched),
+    sensitivity,
+    vague: classifyVague(lowerText, matched, sensitivity),
   };
 }
 

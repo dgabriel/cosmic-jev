@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   askOracle,
-  CONSEQUENTIAL_THRESHOLD,
   createOracle,
   route,
   StubOracle,
   VAGUE_THRESHOLD,
   type ClassificationResult,
   type OracleContext,
+  type SensitivityCategory,
   type VerdictInput,
 } from "./oracle";
 import { signForLongitude, TRANSIT_BODIES, type BodyPosition, type TransitBodyName, type TransitChart } from "./sky";
@@ -48,30 +48,59 @@ function makeNatalChart(): NatalChart {
 }
 
 describe("route", () => {
-  function classification(consequential: number, vague: number): ClassificationResult {
-    return { category: "Mars", consequential, vague };
+  function classification(sensitivity: SensitivityCategory, vague: number): ClassificationResult {
+    return { category: "Mars", sensitivity, vague };
   }
 
-  it("recuses just below, at, and just above the consequential threshold", () => {
-    expect(route(classification(CONSEQUENTIAL_THRESHOLD - 0.01, 0)).kind).toBe("proceed");
-    expect(route(classification(CONSEQUENTIAL_THRESHOLD, 0)).kind).toBe("recusal");
-    expect(route(classification(CONSEQUENTIAL_THRESHOLD + 0.01, 0)).kind).toBe("recusal");
+  const RECUSING_SENSITIVITIES: readonly SensitivityCategory[] = ["violence_person", "safety", "legal"];
+  const DISCLAIMER_SENSITIVITIES: readonly SensitivityCategory[] = ["health", "money", "relationship_ending", "job_quitting"];
+  const NO_DISCLAIMER_SENSITIVITIES: readonly SensitivityCategory[] = ["violence_object", "none"];
+
+  it.each(RECUSING_SENSITIVITIES)("recuses for sensitivity=%s regardless of vague", (sensitivity) => {
+    expect(route(classification(sensitivity, 0)).kind).toBe("recusal");
+    expect(route(classification(sensitivity, 1)).kind).toBe("recusal");
   });
 
-  it("asks for detail just below, at, and just above the vague threshold (consequential low)", () => {
-    expect(route(classification(0, VAGUE_THRESHOLD - 0.01)).kind).toBe("proceed");
-    expect(route(classification(0, VAGUE_THRESHOLD)).kind).toBe("needs-detail");
-    expect(route(classification(0, VAGUE_THRESHOLD + 0.01)).kind).toBe("needs-detail");
+  it.each(RECUSING_SENSITIVITIES)("route()'s recusal carries reason=%s for tests/telemetry", (sensitivity) => {
+    const decision = route(classification(sensitivity, 0));
+    expect(decision).toEqual({ kind: "recusal", reason: sensitivity });
   });
 
-  it("recuses even when vague is also high (consequential takes priority)", () => {
-    const decision = route(classification(CONSEQUENTIAL_THRESHOLD, VAGUE_THRESHOLD));
+  it("checks violence_person with the highest priority: it wins even when safety/legal/health/money also apply"
+    + " (adversarial-priority regression: sensitivity is a single classified bucket, so this exercises route()'s"
+    + " own priority order directly rather than relying on StubOracle's heuristic to have picked one bucket)", () => {
+    // route() only ever sees one sensitivity value at a time (Call 1's Choice
+    // answer picks a single bucket) -- this test's point is that route()
+    // itself, given that bucket is violence_person, never lets vague or any
+    // other consideration turn it into anything but a recusal.
+    expect(route(classification("violence_person", VAGUE_THRESHOLD)).kind).toBe("recusal");
+    expect(route(classification("violence_person", 1)).kind).toBe("recusal");
+  });
+
+  it.each(DISCLAIMER_SENSITIVITIES)("proceeds with disclaimer=true for sensitivity=%s", (sensitivity) => {
+    const decision = route(classification(sensitivity, 0));
+    expect(decision).toEqual({ kind: "proceed", category: "Mars", disclaimer: true });
+  });
+
+  it.each(NO_DISCLAIMER_SENSITIVITIES)("proceeds with disclaimer=false for sensitivity=%s", (sensitivity) => {
+    const decision = route(classification(sensitivity, 0));
+    expect(decision).toEqual({ kind: "proceed", category: "Mars", disclaimer: false });
+  });
+
+  it("asks for detail just below, at, and just above the vague threshold (non-recusing sensitivity)", () => {
+    expect(route(classification("none", VAGUE_THRESHOLD - 0.01)).kind).toBe("proceed");
+    expect(route(classification("none", VAGUE_THRESHOLD)).kind).toBe("needs-detail");
+    expect(route(classification("none", VAGUE_THRESHOLD + 0.01)).kind).toBe("needs-detail");
+  });
+
+  it("recuses even when vague is also high (violence_person/safety/legal take priority over vague)", () => {
+    const decision = route(classification("safety", VAGUE_THRESHOLD));
     expect(decision.kind).toBe("recusal");
   });
 
-  it("proceeds with the classified category when neither threshold is met", () => {
-    const decision = route(classification(0, 0));
-    expect(decision).toEqual({ kind: "proceed", category: "Mars" });
+  it("proceeds with the classified category and disclaimer=false when sensitivity is none and not vague", () => {
+    const decision = route(classification("none", 0));
+    expect(decision).toEqual({ kind: "proceed", category: "Mars", disclaimer: false });
   });
 });
 
@@ -149,14 +178,14 @@ describe("StubOracle category classification sanity", () => {
 describe("StubOracle keyword-matching false positives (mid-word substring collisions)", () => {
   const oracle = new StubOracle();
 
-  it('does not score "pursue a hobby today" as consequential via "sue" inside "pursue"', async () => {
+  it('does not score "pursue a hobby today" as legal via "sue" inside "pursue"', async () => {
     const result = await oracle.classify("Should I pursue a hobby today");
-    expect(result.consequential).toBeLessThan(CONSEQUENTIAL_THRESHOLD);
+    expect(result.sensitivity).not.toBe("legal");
   });
 
-  it('does not score "resolve an issue with a friend" as consequential via "sue" inside "issue"', async () => {
+  it('does not score "resolve an issue with a friend" as legal via "sue" inside "issue"', async () => {
     const result = await oracle.classify("Resolve an issue with a friend");
-    expect(result.consequential).toBeLessThan(CONSEQUENTIAL_THRESHOLD);
+    expect(result.sensitivity).not.toBe("legal");
   });
 
   it('does not classify a plain "brunch" activity as Mars via "run" inside "brunch"', async () => {
@@ -187,9 +216,9 @@ describe("StubOracle keyword-matching false positives (mid-word substring collis
     expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
   });
 
-  it('is still consequential for "sued" (prefix stemming preserved for "sue")', async () => {
+  it('is still legal for "sued" (prefix stemming preserved for "sue")', async () => {
     const result = await oracle.classify("My landlord sued me over the lease");
-    expect(result.consequential).toBeGreaterThanOrEqual(CONSEQUENTIAL_THRESHOLD);
+    expect(result.sensitivity).toBe("legal");
   });
 });
 
@@ -206,19 +235,19 @@ describe("StubOracle keyword-matching false positives (word-initial prefix colli
     expect(result.category).toBe("Venus");
   });
 
-  it('still scores "illegal" as consequential (added explicitly since "legal" no longer substring-matches it)', async () => {
+  it('still scores "illegal" as legal (added explicitly since "legal" no longer substring-matches it)', async () => {
     const result = await oracle.classify("Is it illegal to do this activity");
-    expect(result.consequential).toBeGreaterThanOrEqual(CONSEQUENTIAL_THRESHOLD);
+    expect(result.sensitivity).toBe("legal");
   });
 });
 
 describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () => {
-  it("recuses on a consequential activity and the type has no favor/intensity to access", async () => {
+  it("recuses on a safety activity and the type has no favor/intensity to access", async () => {
     const oracle = new StubOracle();
     const context: OracleContext = {
       transits: makeTransitChart(),
       natal: makeNatalChart(),
-      activityText: "Should I quit my job and take out a big loan for surgery",
+      activityText: "Should I walk home alone in this dangerous, unsafe neighborhood",
     };
     const outcome = await askOracle(oracle, context);
     expect(outcome.kind).toBe("recusal");
@@ -250,7 +279,7 @@ describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () 
     }
   });
 
-  it("proceeds to a verdict for an ordinary, non-vague, non-consequential activity", async () => {
+  it("proceeds to a verdict for an ordinary, non-vague, non-sensitive activity, with disclaimer=false", async () => {
     const oracle = new StubOracle();
     const context: OracleContext = {
       transits: makeTransitChart(),
@@ -268,6 +297,21 @@ describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () 
       expect(outcome.rulingBodyTransit.body).toBe("Mars");
       expect(Array.isArray(outcome.aspects)).toBe(true);
       expect(outcome.moonPhase).toBe(context.transits.moonPhase);
+      expect(outcome.disclaimer).toBe(false);
+    }
+  });
+
+  it("proceeds to a verdict with disclaimer=true for a health/money/relationship/job-quitting activity (oracle-2au: these no longer recuse)", async () => {
+    const oracle = new StubOracle();
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Should I go to the doctor for my checkup",
+    };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("verdict");
+    if (outcome.kind === "verdict") {
+      expect(outcome.disclaimer).toBe(true);
     }
   });
 });
@@ -322,9 +366,33 @@ describe("StubOracle vague-path false positives (missing everyday-phrasing keywo
     expect(result.category).toBe("Jupiter");
   });
 
-  it('does not match "cardio" (Mars) inside "cardiologist" (no other keyword in this sentence, so it must fall through to vague)', async () => {
-    const result = await oracle.classify("Went to see my cardiologist for a checkup");
+  it('does not match "cardio" (Mars) inside "cardiologist" (no keyword from ANY list in this sentence, so it must fall through to vague)', async () => {
+    // Post-oracle-2au, classifyVague also returns low on a SENSITIVITY
+    // keyword match, not just a category match -- so the sentence here must
+    // avoid both for the vague assertion to discriminate. That is why the
+    // old "...for a checkup" phrasing moved to the next test: "checkup" is
+    // a HEALTH_KEYWORDS entry and now pins vague LOW regardless, making the
+    // vague assertion useless for this regression there. If "cardio" ever
+    // substring-matches inside "cardiologist" again, Mars matches as a
+    // category here and vague drops below the threshold, failing this test.
+    const result = await oracle.classify("Seen my cardiologist");
     expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
+  });
+
+  it('classifies "Went to see my cardiologist for a checkup" as health and NOT vague (a sensitivity match is a specific text, oracle-2au), proceeding to a disclaimer verdict end to end', async () => {
+    const result = await oracle.classify("Went to see my cardiologist for a checkup");
+    expect(result.sensitivity).toBe("health");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Went to see my cardiologist for a checkup",
+    };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("verdict");
+    if (outcome.kind === "verdict") {
+      expect(outcome.disclaimer).toBe(true);
+    }
   });
 
   it('does not match "trivia" (Jupiter) inside "trivial" (no other keyword in this sentence, so it must fall through to vague)', async () => {
@@ -415,34 +483,215 @@ describe("StubOracle vague-path false positives (missing everyday-phrasing keywo
   });
 });
 
-// Regression tests for the reviewer-flagged oracle-d4i gap: `category` and
-// `consequential` are independent Call 1 signals over the same text, so
-// adding "doctor" to Saturn's CATEGORY_KEYWORDS (a doctor's visit as a
-// chore) did nothing on its own to flag a doctor's-visit activity as
-// consequential. "doctor"/"physician"/"checkup" were added to
-// CONSEQUENTIAL_KEYWORDS so route() still recuses these, regardless of
-// which category they classify into.
-describe("StubOracle consequential coverage for doctor/health-adjacent activities", () => {
+// Regression tests for the reviewer-flagged oracle-d4i gap (still relevant
+// post-oracle-2au): `category` and `sensitivity` are independent Call 1
+// signals over the same text, so adding "doctor" to Saturn's
+// CATEGORY_KEYWORDS (a doctor's visit as a chore) did nothing on its own to
+// flag a doctor's-visit activity as health-sensitive. "doctor"/"physician"/
+// "checkup" are in `HEALTH_KEYWORDS` so `route()` still flags these with a
+// disclaimer, regardless of which category they classify into. Per
+// oracle-2au's new policy, health (non-self-harm) proceeds to a real verdict
+// with `disclaimer: true` rather than recusing.
+describe("StubOracle health-sensitivity coverage for doctor/health-adjacent activities", () => {
   const oracle = new StubOracle();
 
-  it('scores "Should I go to the doctor for my checkup" as consequential ("doctor"/"checkup")', async () => {
+  it('scores "Should I go to the doctor for my checkup" as health ("doctor"/"checkup")', async () => {
     const result = await oracle.classify("Should I go to the doctor for my checkup");
-    expect(result.consequential).toBeGreaterThanOrEqual(CONSEQUENTIAL_THRESHOLD);
+    expect(result.sensitivity).toBe("health");
   });
 
-  it('recuses "Should I go to the doctor for my checkup" end to end, instead of sailing through to a verdict', async () => {
+  it('proceeds to a disclaimer-flagged verdict for "Should I go to the doctor for my checkup" end to end (does not recuse)', async () => {
     const context: OracleContext = {
       transits: makeTransitChart(),
       natal: makeNatalChart(),
       activityText: "Should I go to the doctor for my checkup",
     };
     const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("verdict");
+    if (outcome.kind === "verdict") {
+      expect(outcome.disclaimer).toBe(true);
+    }
+  });
+
+  it('scores "See a physician about this" as health ("physician")', async () => {
+    const result = await oracle.classify("See a physician about this");
+    expect(result.sensitivity).toBe("health");
+  });
+});
+
+// oracle-2au: StubOracle's real sensitivity-bucket heuristic. Each
+// non-violence bucket's own keyword coverage first, then the
+// violence_person/violence_object heuristic (self-harm, verb+target,
+// ambiguous-target bias), then the adversarial-priority cases the issue
+// specifically calls for.
+describe("StubOracle sensitivity buckets: money/relationship_ending/job_quitting/safety/legal", () => {
+  const oracle = new StubOracle();
+
+  it('classifies "Should I take out a mortgage on a new house" as money', async () => {
+    const result = await oracle.classify("Should I take out a mortgage on a new house");
+    expect(result.sensitivity).toBe("money");
+  });
+
+  it('classifies "Should I get a divorce" as relationship_ending', async () => {
+    const result = await oracle.classify("Should I get a divorce");
+    expect(result.sensitivity).toBe("relationship_ending");
+  });
+
+  it('classifies "Should I resign from my position" as job_quitting', async () => {
+    const result = await oracle.classify("Should I resign from my position");
+    expect(result.sensitivity).toBe("job_quitting");
+  });
+
+  it('classifies "Is it dangerous and unsafe to go there" as safety', async () => {
+    const result = await oracle.classify("Is it dangerous and unsafe to go there");
+    expect(result.sensitivity).toBe("safety");
+  });
+
+  it('classifies "Should I sue my landlord" as legal', async () => {
+    const result = await oracle.classify("Should I sue my landlord");
+    expect(result.sensitivity).toBe("legal");
+  });
+
+  const DISCLAIMER_BUCKET_EXAMPLES: ReadonlyArray<[string, string]> = [
+    ["money", "Should I take out a mortgage on a new house"],
+    ["relationship_ending", "Should I get a divorce"],
+    ["job_quitting", "Should I resign from my position"],
+    ["health", "Should I go to the doctor for my checkup"],
+  ];
+
+  it.each(DISCLAIMER_BUCKET_EXAMPLES)("%s proceeds to a verdict with disclaimer=true end to end (never recuses)", async (_bucket, activityText) => {
+    const context: OracleContext = { transits: makeTransitChart(), natal: makeNatalChart(), activityText };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("verdict");
+    if (outcome.kind === "verdict") {
+      expect(outcome.disclaimer).toBe(true);
+    }
+  });
+});
+
+describe("StubOracle violence_person via self-harm phrasing (oracle-2au, highest priority)", () => {
+  const oracle = new StubOracle();
+
+  it.each([
+    "Should I hurt myself",
+    "Should I harm myself after this bad day",
+    "I've been thinking about hurting myself",
+    "Should I end my life",
+    "I keep thinking about suicide",
+  ])("classifies %j as violence_person", async (text) => {
+    const result = await oracle.classify(text);
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it("recuses end to end for self-harm phrasing, exactly like the release-gate's mild self-harm test row", async () => {
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Should I hurt myself",
+    };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("recusal");
+  });
+});
+
+describe("StubOracle violence_person vs violence_object (verb + target heuristic)", () => {
+  const oracle = new StubOracle();
+
+  it('classifies "Should I hit my brother" as violence_person (verb + person target)', async () => {
+    const result = await oracle.classify("Should I hit my brother");
+    // "brother" is not itself a listed target keyword, but with no
+    // recognized object target present either, the ambiguous-target bias
+    // still lands this on violence_person (see classifyViolence's doc
+    // comment) -- this test doesn't depend on "brother" being listed.
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it('classifies "Should I hurt my friend" as violence_person (verb + explicit person target)', async () => {
+    const result = await oracle.classify("Should I hurt my friend");
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it('classifies "Should I hurt my dog" as violence_person (verb + animal target)', async () => {
+    const result = await oracle.classify("Should I hurt my dog");
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it('classifies "Should I smash my printer with a baseball bat" as violence_object (verb + clear inanimate target, no person target)', async () => {
+    const result = await oracle.classify("Should I smash my printer with a baseball bat");
+    expect(result.sensitivity).toBe("violence_object");
+  });
+
+  it('classifies "Should I destroy my old computer" as violence_object', async () => {
+    const result = await oracle.classify("Should I destroy my old computer");
+    expect(result.sensitivity).toBe("violence_object");
+  });
+
+  it("violence_object proceeds to a verdict end to end: no recusal, disclaimer=false", async () => {
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Should I smash my printer with a baseball bat",
+    };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("verdict");
+    if (outcome.kind === "verdict") {
+      expect(outcome.disclaimer).toBe(false);
+    }
+  });
+
+  it('classifies "Should I punch someone at the party" as violence_person (verb + explicit person target, even with no self-harm phrasing)', async () => {
+    const result = await oracle.classify("Should I punch someone at the party");
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it('defaults an ambiguous target ("Should I hit something") to violence_person, not none/violence_object', async () => {
+    // "something" contains no leading-word-boundary "thing" (see
+    // OBJECT_TARGET_KEYWORDS's comment) and names no person/animal either --
+    // this is exactly the "no clear target named" case the issue calls out,
+    // which must default to violence_person, not silently fall through.
+    const result = await oracle.classify("Should I hit something");
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it('does not treat "Should I break up with my partner" as violence (the "break up" phrase is stripped before violence-verb matching)', async () => {
+    const result = await oracle.classify("Should I break up with my partner");
+    expect(result.sensitivity).toBe("relationship_ending");
+  });
+});
+
+describe("StubOracle adversarial sensitivity priority: violence_person/safety must still recuse even when another bucket's keywords also match", () => {
+  const oracle = new StubOracle();
+
+  it('classifies text reading as BOTH violence_person AND health as violence_person (verb+person-target keywords win over "surgery")', async () => {
+    // Contains "surgery" (HEALTH_KEYWORDS) and a violence verb + explicit
+    // person target ("hurt"/"myself") in the same sentence.
+    const result = await oracle.classify("Should I hurt myself instead of getting the surgery");
+    expect(result.sensitivity).toBe("violence_person");
+  });
+
+  it("recuses end to end for that same both-violence_person-and-health text, not a health-disclaimer verdict", async () => {
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Should I hurt myself instead of getting the surgery",
+    };
+    const outcome = await askOracle(oracle, context);
     expect(outcome.kind).toBe("recusal");
   });
 
-  it('scores "See a physician about this" as consequential ("physician")', async () => {
-    const result = await oracle.classify("See a physician about this");
-    expect(result.consequential).toBeGreaterThanOrEqual(CONSEQUENTIAL_THRESHOLD);
+  it('classifies text reading as BOTH safety AND money as safety ("dangerous" is checked before "invest")', async () => {
+    const result = await oracle.classify("Is it dangerous to invest all my savings in this");
+    expect(result.sensitivity).toBe("safety");
+  });
+
+  it("recuses end to end for that same both-safety-and-money text, not a money-disclaimer verdict", async () => {
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Is it dangerous to invest all my savings in this",
+    };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("recusal");
   });
 });
 

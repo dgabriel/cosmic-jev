@@ -12,7 +12,7 @@
  * legitimate place in the app that does.
  */
 import { ORACLE_KIND } from "./config";
-import { emojiFor, explainAmbiguity, explainOutcome, firmnessFor } from "./explain";
+import { emojiFor, explainAmbiguity, explainDisclaimer, explainOutcome, firmnessFor } from "./explain";
 import { parseBirthDate, parseBirthTime, parseLocation, parseUtcOffsetMinutes } from "./formInput";
 import { computeNatalChart, type BirthInput, type NatalChart } from "./natal";
 import { askOracle, createOracle, type OracleOutcome } from "./oracle";
@@ -163,6 +163,19 @@ function renderVerdict(outcome: Extract<OracleOutcome, { kind: "verdict" }>, act
   explanation.textContent = explainOutcome(outcome, activityText);
 
   card.append(big, firmnessLabel, explanation);
+
+  // Visible, separate element (not folded into `explanation`) for
+  // disclaimer-flagged verdicts (health/money/relationship_ending/
+  // job_quitting -- oracle-2au): `explainDisclaimer` returns `undefined` for
+  // every other outcome, so this only appends anything when it applies.
+  const disclaimerText = explainDisclaimer(outcome);
+  if (disclaimerText !== undefined) {
+    const disclaimer = document.createElement("p");
+    disclaimer.className = "verdict-disclaimer";
+    disclaimer.textContent = disclaimerText;
+    card.append(disclaimer);
+  }
+
   resultSection.append(card);
 }
 

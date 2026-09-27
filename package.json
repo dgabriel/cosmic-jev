@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run release-gate",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release-gate": "node scripts/release-gate.mjs"
   },
   "dependencies": {
     "astronomy-engine": "^2.1.19"

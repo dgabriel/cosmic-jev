@@ -67,16 +67,32 @@ ambiguity test.
   - Saturn: work, chores, commitments, long-term planning
   - Moon: home, cooking, family, rest, self-care
   - Sun: performance, creative self-expression, being the center of attention
-- Noul: "Is this a consequential real-life decision (health, medication,
-  money, legal, safety, ending a relationship, quitting a job)?"
+- Choice, sensitivity → one bucket per activity (oracle-2au):
+  - `violence_person`: violence or harm directed at a person or animal,
+    including the asker harming themselves (self-harm, suicide-adjacent
+    text)
+  - `safety`, `legal`
+  - `health` (never self-harm -- that is always `violence_person`), `money`,
+    `relationship_ending`, `job_quitting`
+  - `violence_object`: violence or destruction directed at an inanimate
+    object only (smashing a printer, punching a wall)
+  - `none`
 - Noul: "Is this activity description too vague to categorize?"
 
-Routing:
-- consequential p ≥ 0.3 → playful recusal ("The stars recuse themselves from
-  this one."). No verdict, no probability shown. Keep the threshold low on
-  purpose: false alarms are cheap and misses aren't funny.
+Routing, in this priority order:
+- `violence_person` → playful recusal ("The stars recuse themselves from
+  this one."), always, checked before anything else. No verdict, no
+  probability shown, and nothing else in the routing can override this into
+  a verdict.
+- `safety`, `legal` → same recusal, no exceptions.
 - vague p ≥ 0.6 → ask the user to be more specific
-- otherwise → Call 2
+- `health`, `money`, `relationship_ending`, `job_quitting` → Call 2, and
+  show the verdict together with a visible "this is not real advice"
+  disclaimer; keep the tone light
+- `violence_object`, `none` → Call 2, no special handling
+
+Whenever the bucket is ambiguous, bias toward recusal: false alarms are
+cheap and misses aren't funny.
 
 **Call 2: the verdict** (state = category, ruling body's transit position and
 retrograde status, relevant aspect list, Moon phase, the activity text)
@@ -88,7 +104,9 @@ retrograde status, relevant aspect list, Moon phase, the activity text)
 - Inputs: birthdate (required), birth time + location (optional, collapsed),
   activity (free text)
 - Result: a big 👍 or 👎, with "firmly" vs "tentatively" based on distance
-  from 0.5
+  from 0.5. Verdicts in the disclaimer buckets (health, money,
+  relationship-ending, job-quitting) additionally show the disclaimer as a
+  visibly separate element next to the explanation.
 - Deadpan explanation templated from the typed results. No LLM-generated text.
   Example: "Bowling is ruled by Mars. Mars is direct in Aries, trine your natal
   Sun. The cosmos endorses this (p = 0.81). Firmly 👍."
@@ -105,7 +123,10 @@ retrograde status, relevant aspect list, Moon phase, the activity text)
 
 ## Non-goals
 - No written horoscope text and no scraped horoscope content
-- No verdicts on consequential decisions, ever (see routing above)
+- No verdicts on violence toward a person or animal (including self-harm),
+  safety, or legal questions, ever -- those always recuse (see routing
+  above). Health, money, relationship-ending, and job-quitting questions do
+  get verdicts, always with a visible disclaimer.
 - No storing birthdates server-side
 
 ## Amendment: Jev is called via OpenRouter

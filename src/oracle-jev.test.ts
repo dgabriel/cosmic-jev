@@ -84,7 +84,7 @@ describe("JevOracle.classify (Call 1)", () => {
     const { fetchImpl, calls } = makeFetch(
       upstreamOk({
         category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: { Mars: 0.8 } },
-        consequential: { type: "noul", noul: 0.05 },
+        sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: { none: 0.9 } },
         vague: { type: "noul", noul: 0.1 },
       }),
     );
@@ -92,7 +92,7 @@ describe("JevOracle.classify (Call 1)", () => {
 
     const result = await oracle.classify("bowling with friends");
 
-    expect(result).toEqual({ category: "Mars", consequential: 0.05, vague: 0.1 });
+    expect(result).toEqual({ category: "Mars", sensitivity: "none", vague: 0.1 });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe(`${WORKER_URL}/api/decide`);
@@ -108,7 +108,7 @@ describe("JevOracle.classify (Call 1)", () => {
     expect(body).not.toHaveProperty("model");
 
     const questions = body["questions"] as Record<string, Record<string, unknown>>;
-    expect(Object.keys(questions).sort()).toEqual(["category", "consequential", "vague"]);
+    expect(Object.keys(questions).sort()).toEqual(["category", "sensitivity", "vague"]);
     expect(questions["category"]).toMatchObject({ type: "choice" });
     expect(typeof questions["category"]?.["instructions"]).toBe("string");
     expect(questions["category"]?.["criteria"]).toMatchObject({
@@ -120,11 +120,25 @@ describe("JevOracle.classify (Call 1)", () => {
       Moon: expect.any(String),
       Sun: expect.any(String),
     });
-    expect(questions["consequential"]).toEqual({
-      type: "noul",
-      instructions:
-        "Is this a consequential real-life decision (health, medication, money, legal, safety, ending a relationship, quitting a job)?",
+    expect(questions["sensitivity"]).toMatchObject({ type: "choice" });
+    expect(typeof questions["sensitivity"]?.["instructions"]).toBe("string");
+    // Every one of the eight SensitivityCategory buckets has its own
+    // criteria description, and violence_person's criterion explicitly
+    // mentions self-harm (safety-critical wording -- see oracle-jev.ts's
+    // SENSITIVITY_CRITERIA comment).
+    expect(questions["sensitivity"]?.["criteria"]).toMatchObject({
+      safety: expect.any(String),
+      legal: expect.any(String),
+      violence_person: expect.any(String),
+      health: expect.any(String),
+      money: expect.any(String),
+      relationship_ending: expect.any(String),
+      job_quitting: expect.any(String),
+      violence_object: expect.any(String),
+      none: expect.any(String),
     });
+    const sensitivityCriteria = questions["sensitivity"]?.["criteria"] as Record<string, string>;
+    expect(sensitivityCriteria["violence_person"]).toMatch(/self-harm|suicide/i);
     expect(questions["vague"]).toEqual({
       type: "noul",
       instructions: "Is this activity description too vague to categorize?",
@@ -135,13 +149,49 @@ describe("JevOracle.classify (Call 1)", () => {
     const { fetchImpl } = makeFetch(
       upstreamOk({
         category: { type: "choice", choice: "Pluto", confidence: 0.5, probabilities: {} },
-        consequential: { type: "noul", noul: 0.1 },
+        sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
         vague: { type: "noul", noul: 0.1 },
       }),
     );
     const oracle = new JevOracle({ workerUrl: WORKER_URL, fetchImpl });
 
     await expect(oracle.classify("bowling")).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it("rejects with invalid_response when the sensitivity choice is not one of the eight known buckets", async () => {
+    const { fetchImpl } = makeFetch(
+      upstreamOk({
+        category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
+        sensitivity: { type: "choice", choice: "danger_noodle", confidence: 0.5, probabilities: {} },
+        vague: { type: "noul", noul: 0.1 },
+      }),
+    );
+    const oracle = new JevOracle({ workerUrl: WORKER_URL, fetchImpl });
+
+    await expect(oracle.classify("bowling")).rejects.toMatchObject({ code: "invalid_response" });
+  });
+
+  it.each([
+    "safety",
+    "legal",
+    "violence_person",
+    "health",
+    "money",
+    "relationship_ending",
+    "job_quitting",
+    "violence_object",
+    "none",
+  ])("maps sensitivity=%s straight through to ClassificationResult", async (sensitivity) => {
+    const { fetchImpl } = makeFetch(
+      upstreamOk({
+        category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
+        sensitivity: { type: "choice", choice: sensitivity, confidence: 0.9, probabilities: {} },
+        vague: { type: "noul", noul: 0.1 },
+      }),
+    );
+    const oracle = new JevOracle({ workerUrl: WORKER_URL, fetchImpl });
+    const result = await oracle.classify("bowling");
+    expect(result.sensitivity).toBe(sensitivity);
   });
 });
 
@@ -277,7 +327,7 @@ describe("network failures", () => {
   it("uses the global fetch by default when no fetchImpl is injected", async () => {
     const response = upstreamOk({
       category: { type: "choice", choice: "Sun", confidence: 0.9, probabilities: {} },
-      consequential: { type: "noul", noul: 0.05 },
+      sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
       vague: { type: "noul", noul: 0.05 },
     });
     const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
@@ -297,7 +347,7 @@ describe("request construction", () => {
     const { fetchImpl: fetch1, calls: calls1 } = makeFetch(
       upstreamOk({
         category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
-        consequential: { type: "noul", noul: 0.05 },
+        sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
         vague: { type: "noul", noul: 0.05 },
       }),
     );
@@ -318,7 +368,7 @@ describe("request construction", () => {
     const { fetchImpl, calls } = makeFetch(
       upstreamOk({
         category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
-        consequential: { type: "noul", noul: 0.05 },
+        sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
         vague: { type: "noul", noul: 0.05 },
       }),
     );
@@ -330,21 +380,23 @@ describe("request construction", () => {
 
 describe("malformed upstream numeric answers (never silently trusted)", () => {
   // `typeof NaN === "number"`, so a naive `typeof` check alone would let a
-  // NaN "consequential"/"vague" probability through: route()'s `p >=
-  // threshold` checks (oracle.ts) are `false` for NaN, which would silently
-  // fall through to "proceed" instead of recusing on a consequential
-  // decision -- contrary to the spec's "No verdicts on consequential
-  // decisions, ever." These use fakeJsonResponse (bypassing real JSON
-  // encoding, which cannot carry NaN/Infinity at all) to simulate a
-  // buggy/compromised provider reply.
+  // NaN "vague" probability through: route()'s `p >= VAGUE_THRESHOLD` check
+  // (oracle.ts) is `false` for NaN, which would silently fall through to
+  // "proceed" instead of asking for more detail. These use fakeJsonResponse
+  // (bypassing real JSON encoding, which cannot carry NaN/Infinity at all)
+  // to simulate a buggy/compromised provider reply. (Call 1's other Noul,
+  // the old "consequential" probability, is retired as of oracle-2au in
+  // favor of the `sensitivity` Choice -- see the "rejects with
+  // invalid_response when the sensitivity choice is not one of the eight
+  // known buckets" test above for its analogous malformed-answer coverage.)
 
-  it("rejects Call 1 with invalid_response when the consequential noul is NaN", async () => {
+  it("rejects Call 1 with invalid_response when the vague noul is NaN", async () => {
     const { fetchImpl } = makeFetch(
       fakeJsonResponse({
         answers: {
           category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
-          consequential: { type: "noul", noul: Number.NaN },
-          vague: { type: "noul", noul: 0.1 },
+          sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
+          vague: { type: "noul", noul: Number.NaN },
         },
       }),
     );
@@ -357,7 +409,7 @@ describe("malformed upstream numeric answers (never silently trusted)", () => {
       fakeJsonResponse({
         answers: {
           category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
-          consequential: { type: "noul", noul: 0.1 },
+          sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
           vague: { type: "noul", noul: Number.POSITIVE_INFINITY },
         },
       }),
@@ -366,13 +418,13 @@ describe("malformed upstream numeric answers (never silently trusted)", () => {
     await expect(oracle.classify("bowling")).rejects.toMatchObject({ code: "invalid_response" });
   });
 
-  it.each([1.5, -0.2])("rejects Call 1 with invalid_response when a noul probability (%d) is out of [0, 1]", async (noul) => {
+  it.each([1.5, -0.2])("rejects Call 1 with invalid_response when the vague noul probability (%d) is out of [0, 1]", async (noul) => {
     const { fetchImpl } = makeFetch(
       fakeJsonResponse({
         answers: {
           category: { type: "choice", choice: "Mars", confidence: 0.8, probabilities: {} },
-          consequential: { type: "noul", noul },
-          vague: { type: "noul", noul: 0.1 },
+          sensitivity: { type: "choice", choice: "none", confidence: 0.9, probabilities: {} },
+          vague: { type: "noul", noul },
         },
       }),
     );

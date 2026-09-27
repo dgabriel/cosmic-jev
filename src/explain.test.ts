@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   CUSP_MESSAGE,
+  DISCLAIMER_MESSAGE,
   emojiFor,
   explainAmbiguity,
+  explainDisclaimer,
   explainOutcome,
   explainVerdict,
   FIRMNESS_DISTANCE_THRESHOLD,
@@ -50,6 +52,7 @@ function makeVerdictOutcome(overrides: Partial<Extract<OracleOutcome, { kind: "v
     moonPhase: "full",
     favor: 0.81,
     intensity: 0.5,
+    disclaimer: false,
     ...overrides,
   };
 }
@@ -226,5 +229,25 @@ describe("explainAmbiguity", () => {
   it("does not flag a merely not-computed Ascendant (no time/location given, expected)", () => {
     const natal = makeNatalChart({ ascendant: { status: "not-computed" } });
     expect(explainAmbiguity(natal)).toEqual([]);
+  });
+});
+
+describe("explainDisclaimer (oracle-2au)", () => {
+  it("returns the disclaimer message for a disclaimer-flagged verdict", () => {
+    const outcome = makeVerdictOutcome({ disclaimer: true });
+    expect(explainDisclaimer(outcome)).toBe(DISCLAIMER_MESSAGE);
+  });
+
+  it("returns undefined for a non-disclaimer verdict", () => {
+    const outcome = makeVerdictOutcome({ disclaimer: false });
+    expect(explainDisclaimer(outcome)).toBeUndefined();
+  });
+
+  it("returns undefined for a recusal outcome", () => {
+    expect(explainDisclaimer({ kind: "recusal" })).toBeUndefined();
+  });
+
+  it("returns undefined for a needs-detail outcome", () => {
+    expect(explainDisclaimer({ kind: "needs-detail" })).toBeUndefined();
   });
 });

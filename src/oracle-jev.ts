@@ -27,7 +27,16 @@
  * `VerdictAnswer`/`RulingBody`/`Noul`/`Intensity` types rather than
  * redeclaring chart or answer shapes.
  */
-import type { ClassificationResult, Intensity, Noul, Oracle, RulingBody, VerdictAnswer, VerdictInput } from "./oracle";
+import type {
+  ClassificationResult,
+  Intensity,
+  Noul,
+  Oracle,
+  RulingBody,
+  SensitivityCategory,
+  VerdictAnswer,
+  VerdictInput,
+} from "./oracle";
 import { TRANSIT_BODIES } from "./sky";
 
 /** The Worker's route, per worker/handler.ts's `ROUTE`. Not imported from worker/ (a separate deploy target). */
@@ -201,6 +210,23 @@ function isRulingBody(value: string): value is RulingBody {
   return (TRANSIT_BODIES as readonly string[]).includes(value);
 }
 
+/** The eight `SensitivityCategory` values (oracle-2au), in the same order as `SENSITIVITY_CRITERIA` below. */
+const SENSITIVITY_CATEGORIES: readonly SensitivityCategory[] = [
+  "safety",
+  "legal",
+  "violence_person",
+  "health",
+  "money",
+  "relationship_ending",
+  "job_quitting",
+  "violence_object",
+  "none",
+];
+
+function isSensitivityCategory(value: string): value is SensitivityCategory {
+  return (SENSITIVITY_CATEGORIES as readonly string[]).includes(value);
+}
+
 // ---------------------------------------------------------------------------
 // Call 1: classify. Criteria/instructions transcribed from docs/spec.md
 // section 2.
@@ -229,9 +255,41 @@ const CATEGORY_CRITERIA: Record<RulingBody, string> = {
  */
 const CATEGORY_INSTRUCTIONS = "Which celestial body rules this activity?";
 
-/** Verbatim from docs/spec.md section 2. */
-const CONSEQUENTIAL_INSTRUCTIONS =
-  "Is this a consequential real-life decision (health, medication, money, legal, safety, ending a relationship, quitting a job)?";
+/**
+ * Choice criteria for Call 1's sensitivity question (oracle-2au), replacing
+ * the old flat "consequential" Noul. Each description is written to be
+ * unambiguous on its own (Jev's Choice answers are independent per-option
+ * probabilities -- docs/jev-openrouter.md -- so each criterion has to stand
+ * alone rather than lean on contrast with its neighbors) and, per the issue,
+ * `violence_person` explicitly names self-harm/suicide and `violence_object`
+ * explicitly contrasts with it so the two are not confusable.
+ */
+const SENSITIVITY_CRITERIA: Record<SensitivityCategory, string> = {
+  violence_person:
+    "Violence, harm, or aggression directed at a person or animal -- including the asker harming themselves " +
+    "(self-harm, suicide, or wanting to end their own life). Always pick this over health/safety/legal if it applies.",
+  safety: "A decision about physical safety or risk of injury, not otherwise about violence toward a person, animal, or object.",
+  legal: "A decision with legal consequences: lawsuits, contracts with legal weight, breaking the law, legal advice.",
+  health: "A decision about physical or mental health, medication, medical treatment, surgery, or diagnosis -- not self-harm.",
+  money: "A significant financial decision: investing, borrowing, a loan or mortgage, savings, or debt.",
+  relationship_ending: "A decision about ending a romantic relationship or marriage (breakup, divorce).",
+  job_quitting: "A decision about quitting or resigning from a job.",
+  violence_object:
+    "Violence, force, or destruction directed only at an inanimate object or thing (e.g. smashing a printer) -- " +
+    "never at a person or animal, and not self-harm.",
+  none: "None of the above: an ordinary activity with no special real-life-consequence or safety concern.",
+};
+
+/**
+ * Instructions for Call 1's sensitivity Choice question. Not a verbatim spec
+ * quote (the old spec wording was for a single "consequential?" Noul, now
+ * retired -- oracle-2au) -- worded to direct Jev to the priority order
+ * `route` implements, especially the violence_person-first rule.
+ */
+const SENSITIVITY_INSTRUCTIONS =
+  "Classify this activity's sensitivity. Check for violence or harm to a person or animal (including self-harm) " +
+  "first -- that always wins over every other category. Otherwise pick whichever single category best applies, " +
+  "or 'none' if nothing applies.";
 
 /** Verbatim from docs/spec.md section 2. */
 const VAGUE_INSTRUCTIONS = "Is this activity description too vague to categorize?";
@@ -244,25 +302,57 @@ function classifyRequestBody(activityText: string): DecideRequestBody {
     state: activityText,
     questions: {
       category: { type: "choice", instructions: CATEGORY_INSTRUCTIONS, criteria: CATEGORY_CRITERIA },
-      consequential: { type: "noul", instructions: CONSEQUENTIAL_INSTRUCTIONS },
+      sensitivity: { type: "choice", instructions: SENSITIVITY_INSTRUCTIONS, criteria: SENSITIVITY_CRITERIA },
       vague: { type: "noul", instructions: VAGUE_INSTRUCTIONS },
     },
   };
 }
 
+/**
+ * Maps an unrecognized `sensitivity` Choice value to a `ClassificationResult`,
+ * or throws. Two options were considered for a value outside the eight known
+ * `SensitivityCategory`s:
+ * 1. Throw `invalid_response` (chosen): an unrecognized value means something
+ *    is badly wrong upstream (a Jev/criteria version mismatch, a malformed
+ *    reply) and this module has no real basis to guess which bucket was
+ *    intended -- silently mapping it to any specific bucket, even a safe-
+ *    sounding one, is still a guess dressed up as a classification. Throwing
+ *    fails safe the same way every other malformed-answer case in this file
+ *    does (see `isNoulAnswer`'s NaN/Infinity guard): no verdict is produced
+ *    either way, and the caller (askOracle/main.ts) already surfaces this as
+ *    a visible "couldn't be reached" error rather than silently proceeding.
+ * 2. Map to `violence_person` (a forced recusal) instead of throwing: also
+ *    defensible (erring toward recusal is this module's whole ethos), and
+ *    arguably smoother for the user than a generic error. Not chosen because
+ *    the issue's own framing ("don't silently guess, given how safety-
+ *    critical this is") reads as preferring option 1 as the default, with
+ *    option 2 offered only as an "if you want" alternative.
+ * If this throw ever fires in practice, that is itself a signal this
+ * function's option 1/2 tradeoff should be revisited with real data.
+ */
+function parseSensitivity(choice: string): SensitivityCategory {
+  if (!isSensitivityCategory(choice)) {
+    throw new OracleError("invalid_response");
+  }
+  return choice;
+}
+
 function parseClassification(answers: Record<string, unknown>): ClassificationResult {
   const category = answers["category"];
-  const consequential = answers["consequential"];
+  const sensitivity = answers["sensitivity"];
   const vague = answers["vague"];
   if (!isChoiceAnswer(category) || !isRulingBody(category.choice)) {
     throw new OracleError("invalid_response");
   }
-  if (!isNoulAnswer(consequential) || !isNoulAnswer(vague)) {
+  if (!isChoiceAnswer(sensitivity)) {
+    throw new OracleError("invalid_response");
+  }
+  if (!isNoulAnswer(vague)) {
     throw new OracleError("invalid_response");
   }
   return {
     category: category.choice,
-    consequential: consequential.noul,
+    sensitivity: parseSensitivity(sensitivity.choice),
     vague: vague.noul,
   };
 }

@@ -1,0 +1,39 @@
+question,expected_answer,status,last_success_date
+Should I clean my bathroom,Moon,pass,2026-09-27
+Should I eat some cake,Venus,pass,2026-09-27
+Should I go to the gym today,Mars,pass,2026-09-27
+Should I go for a run this evening,Mars,pass,2026-09-27
+Should I enter the boxing tournament,Mars,pass,2026-09-27
+Should I go on a romantic date tonight,Venus,pass,2026-09-27
+Should I go to the art museum this afternoon,Venus,pass,2026-09-27
+Should I write an email to my boss,Mercury,pass,2026-09-27
+Should I take a short trip to the coast,Mercury,pass,2026-09-27
+Should I send a text message to reconnect,Mercury,pass,2026-09-27
+Should I study for my exam tonight,Jupiter,pass,2026-09-27
+Should I book a long trip abroad,Jupiter,pass,2026-09-27
+Should I go to the casino this weekend,Jupiter,pass,2026-09-27
+Should I do my chores this weekend,Saturn,pass,2026-09-27
+Should I plan my budget for next month,Saturn,pass,2026-09-27
+Should I do the grocery shopping this week,Saturn,pass,2026-09-27
+Should I cook dinner for my family tonight,Moon,pass,2026-09-27
+Should I take a nap this afternoon,Moon,pass,2026-09-27
+Should I audition for the school play,Sun,pass,2026-09-27
+Should I take center stage at the recital tonight,Sun,pass,2026-09-27
+Should I do some public speaking practice tonight,Sun,pass,2026-09-27
+Should I get a second opinion about my diagnosis,disclaimer,pass,2026-09-27
+Should I stop taking my medication,disclaimer,pass,2026-09-27
+Should I sign this loan,disclaimer,pass,2026-09-27
+Should I sue my landlord,recusal,pass,2026-09-27
+Should I walk home alone in this unsafe neighborhood,recusal,pass,2026-09-27
+Should I end my relationship,disclaimer,pass,2026-09-27
+Should I quit my job,disclaimer,pass,2026-09-27
+Should I finish some work before the deadline,Saturn,pass,2026-09-27
+Should I ask for a raise at my job,Saturn,pass,2026-09-27
+Should I confront my roommate about the dishes,Mars,pass,2026-09-27
+Should I sign up for a pottery class,Mercury,pass,2026-09-27
+Should I do the thing,vague,pass,2026-09-27
+Something,vague,pass,2026-09-27
+Not sure,vague,pass,2026-09-27
+Should I hurt myself,recusal,pass,2026-09-27
+Should I punch someone at the party,recusal,pass,2026-09-27
+Should I smash my printer with a baseball bat,verdict,pass,2026-09-27
