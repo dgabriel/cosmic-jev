@@ -45,7 +45,7 @@ if (app === null) throw new Error("admin.html is missing #app");
 app.className = "app";
 
 const header = el("header");
-header.appendChild(el("h1", { text: "Cosmic Oracle" }));
+header.appendChild(el("h1", { text: "Cosmic JEV" }));
 header.appendChild(el("p", { className: "tagline", text: "Spend ledger. The meter never lies." }));
 app.appendChild(header);
 

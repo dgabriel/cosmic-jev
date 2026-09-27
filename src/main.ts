@@ -29,7 +29,7 @@ if (app === null) {
 app.innerHTML = `
   <div class="app">
     <header>
-      <h1>Cosmic Oracle</h1>
+      <h1>Cosmic JEV</h1>
       <p class="tagline">Real planetary positions. Absurd question. Deadpan answer.</p>
     </header>
 
@@ -224,7 +224,7 @@ async function handleSubmit(): Promise<void> {
     renderAmbiguity(natal);
     renderOutcome(outcome, activityText);
   } catch (error) {
-    console.error("Cosmic Oracle: failed to produce an outcome", error);
+    console.error("Cosmic JEV: failed to produce an outcome", error);
     renderMessage(
       resultSection,
       "The oracle couldn't be reached just now. Please try again in a moment.",
