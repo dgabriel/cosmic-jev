@@ -6,7 +6,9 @@ compatibility_date = "2026-09-26"
 # OPENROUTER_API_KEY` when deployed, worker/.dev.vars locally. Never put it here.
 [vars]
 # Exact browser origins allowed to call the Worker (an Origin has no path).
-ALLOWED_ORIGINS = "https://dgabriel.github.io,http://localhost:5173"
+# dawngabriel.com is a custom domain on the user Pages site, so project sites
+# resolve there instead of dgabriel.github.io; both stay allowlisted.
+ALLOWED_ORIGINS = "https://dawngabriel.com,https://dgabriel.github.io,http://localhost:5173"
 # Pinned Jev release so the routing thresholds stay stable (docs/jev-openrouter.md).
 JEV_MODEL = "typesafe/jev-1.13"
 # Rolling-7-day OpenRouter spend cap per IP bucket (IPv6 collapses to /64).
