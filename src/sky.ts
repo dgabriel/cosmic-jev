@@ -4,9 +4,11 @@
  * Pure, typed, no I/O. The `date` for "now" is always passed in by the
  * caller; nothing here reads the system clock.
  *
- * Natal chart (with cusp ambiguity / optional Ascendant) and aspect
- * computation are separate concerns (bd oracle-55h, oracle-47m) and are
- * intentionally NOT implemented in this module.
+ * Natal chart (with cusp ambiguity / optional Ascendant) lives in
+ * ./natal.ts (bd oracle-55h), which reuses `positionForBody`,
+ * `normalizeDegrees`, `signForLongitude`, `TRANSIT_BODIES`, and the body
+ * position/sign types exported here. Aspect computation (oracle-47m) is a
+ * separate concern and is intentionally NOT implemented in this module.
  */
 import * as Astronomy from "astronomy-engine";
 
@@ -92,8 +94,13 @@ export interface TransitChart {
   moonPhase: MoonPhaseName;
 }
 
-/** Normalizes an angle to [0, 360). */
-function normalizeDegrees(angle: number): number {
+/**
+ * Normalizes an angle to [0, 360).
+ *
+ * Exported so natal.ts (oracle-55h) can reuse it (e.g. for normalizing the
+ * Ascendant longitude) instead of re-implementing the same modulo logic.
+ */
+export function normalizeDegrees(angle: number): number {
   const wrapped = angle % 360;
   return wrapped < 0 ? wrapped + 360 : wrapped;
 }
@@ -148,7 +155,15 @@ function isRetrograde(bodyName: TransitBodyName, astronomyBody: Astronomy.Body, 
   return delta < 0;
 }
 
-function positionForBody(bodyName: TransitBodyName, date: Date): BodyPosition {
+/**
+ * Computes a single body's position (longitude, sign, degree, retrograde) at
+ * an arbitrary instant.
+ *
+ * Exported so natal.ts (oracle-55h) can reuse this exact astronomy call for
+ * natal body positions and for the natal day-boundary ambiguity check,
+ * instead of re-implementing the GeoVector/Ecliptic/retrograde math.
+ */
+export function positionForBody(bodyName: TransitBodyName, date: Date): BodyPosition {
   const astronomyBody = ASTRONOMY_BODY[bodyName];
   const longitude = eclipticLongitudeOfDate(astronomyBody, date);
   const { sign, degreeInSign } = signForLongitude(longitude);
