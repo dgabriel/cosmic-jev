@@ -4,3 +4,14 @@
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Node / build output
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+
+# Local env / secrets (Vite loads .env* into VITE_ vars; never commit keys)
+.env
+.env.*
+.dev.vars.*

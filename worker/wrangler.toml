@@ -1,0 +1,11 @@
+name = "cosmic-oracle-worker"
+main = "index.ts"
+compatibility_date = "2026-09-26"
+
+# Non-secret config. OPENROUTER_API_KEY is a secret: `wrangler secret put
+# OPENROUTER_API_KEY` when deployed, worker/.dev.vars locally. Never put it here.
+[vars]
+# Exact browser origins allowed to call the Worker (an Origin has no path).
+ALLOWED_ORIGINS = "https://dgabriel.github.io,http://localhost:5173"
+# Pinned Jev release so the routing thresholds stay stable (docs/jev-openrouter.md).
+JEV_MODEL = "typesafe/jev-1.13"

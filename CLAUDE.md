@@ -60,18 +60,31 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Build & Test
 
-_Add your build and test commands here_
+Requires Node >= 22.12 (Vitest 5 and Wrangler 4). Install once with `npm install`.
 
 ```bash
-# Example:
-# npm install
-# npm test
+npm run dev         # Vite dev server (http://localhost:5173)
+npm run build       # typecheck, then production build to dist/
+npm test            # Vitest, single run
+npm run typecheck   # tsc --noEmit over src/, worker/ and vite.config.ts
+npx wrangler deploy --dry-run --outdir /tmp/wr --config worker/wrangler.toml   # verify the Worker bundles
 ```
+
+- Oracle selection: `VITE_ORACLE=stub|jev` (default `stub`), read in `src/config.ts`. It is a build-time, non-secret value. Never put the OpenRouter key in a `VITE_` variable.
+- Worker secrets go in `.dev.vars` locally (gitignored) or `wrangler secret put` when deployed.
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+Cosmic Oracle: a Vite + TypeScript SPA that turns a birthdate and an activity into a 👍/👎 "verdict" from real planetary positions (`astronomy-engine`), interpreted by TypeSafe's Jev model through OpenRouter. A Cloudflare Worker proxies Jev calls so the API key never ships to the client.
+
+- `src/sky.ts` — astronomy module (the part that must be correct)
+- `src/oracle.ts` — `Oracle` interface, `JevOracle`, `StubOracle`
+- `worker/` — Cloudflare Worker proxy
+- `docs/spec.md` — project brief and source of truth; `docs/jev-openrouter.md` — verified Jev API notes
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- Work is tracked in beads (`oracle-*`); route it through the `developer`, `tester` and `reviewer` agents in `.claude/agents/`.
+- Never guess Jev/OpenRouter API shapes or ephemeris reference values. Use `docs/jev-openrouter.md` or the live docs, and cite sources in tests.
+- `OPENROUTER_API_KEY` lives only in a Worker secret. Nothing about the user is stored server-side.
+- Explanation text is templated from typed results. No LLM-generated horoscope text.
