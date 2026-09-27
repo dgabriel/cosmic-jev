@@ -244,6 +244,29 @@ function clamp01(value: number): number {
  * is deliberately simple substring matching, not real classification --
  * spec's own framing is that real classification intelligence is Jev's job
  * in `JevOracle`; this only needs to be "sensible" and deterministic.
+ *
+ * oracle-d4i broadened these lists with common everyday-phrasing synonyms
+ * that real users typed but the original lists missed entirely, sending
+ * clearly-categorizable activities down the vague/needs-detail path instead
+ * (`classifyVague` returns a high probability whenever no keyword matches at
+ * all). Two placement calls worth noting:
+ * - "clean" (as in "clean my bathroom") replaces the old exact-phrase-only
+ *   "clean the house" under Moon, not Saturn: despite Saturn owning spec's
+ *   "chores", the pre-existing "clean the house" entry already treated
+ *   cleaning as a home/self-care activity (spec's Moon: "home ... rest,
+ *   self-care"), and a bare "clean" fully subsumes that old phrase. Keeping
+ *   it a single category (rather than also adding it to Saturn) avoids a
+ *   same-text tie between two categories for the same word. "shower"/"bath"
+ *   join it under Moon for the same home/self-care reasoning. (Reviewer
+ *   noted spec's literal word "chores" is Saturn's, not Moon's -- true, but
+ *   reconsidered and left as-is for the tie/consistency reasons above; this
+ *   is a one-word heuristic pick either way, not a load-bearing distinction.)
+ * - "cake"/"snack"/"restaurant"/"movie"/"concert" go under Venus's
+ *   treats/socializing cluster (spec: "socializing, treats"), not "eat"/
+ *   "food"/"meal"/"dinner"/"lunch"/"breakfast": those broader, everyday meal
+ *   words read as routine eating/cooking (Moon's "cook" already covers that
+ *   domain) rather than a treat, and "eat" alone is too generic a verb to
+ *   safely anchor a category without new false positives.
  */
 const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
   Mars: [
@@ -254,6 +277,10 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "gym",
     "run",
     "jog",
+    "hike",
+    "swim",
+    "cardio",
+    "tournament",
     "competition",
     "compete",
     "race",
@@ -276,6 +303,11 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "party",
     "treat",
     "dessert",
+    "cake",
+    "snack",
+    "restaurant",
+    "movie",
+    "concert",
     "spa",
     "friend",
   ],
@@ -287,6 +319,9 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "short trip",
     "commute",
     "tech",
+    "code",
+    "message",
+    "report",
     "contract",
     "sign",
     "text",
@@ -302,6 +337,10 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "long travel",
     "abroad",
     "vacation",
+    "cruise",
+    "seminar",
+    "trivia",
+    "wager",
     "gamble",
     "gambling",
     "lottery",
@@ -319,6 +358,10 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "plan",
     "budget",
     "deadline",
+    "bills",
+    "grocer", // stems both "grocery" and "groceries" ("grocery" alone would not: -y vs -ies)
+    "errand",
+    "doctor",
     "job",
     "career",
     "discipline",
@@ -334,7 +377,9 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "nap",
     "sleep",
     "laundry",
-    "clean the house",
+    "clean",
+    "shower",
+    "bath",
   ],
   Sun: [
     "perform",
@@ -346,6 +391,9 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "stage",
     "showcase",
     "present",
+    "audition",
+    "recital",
+    "public speaking",
   ],
 } as const;
 
@@ -358,6 +406,25 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
  * "legal") because `keywordRegex` below requires a *leading* word boundary:
  * "illegal" no longer matches via "legal" embedded mid-word, so it needs an
  * explicit entry to keep being recognized as consequential.
+ *
+ * oracle-d4i (reviewer-flagged): `category` and `consequential` are two
+ * independent Call 1 signals over the same text -- adding a keyword to
+ * `CATEGORY_KEYWORDS` never makes it consequential too, and vice versa.
+ * Adding "doctor" to Saturn's list (chores: a doctor's visit) without also
+ * adding it here meant "Should I go to the doctor for my checkup" now
+ * confidently classified as Saturn *and* scored zero on consequential (no
+ * "health"/"medicat"/etc. substring), sailing straight through to a verdict
+ * instead of recusing -- exactly the health-decision miss `route`'s low
+ * threshold exists to prevent. "doctor", "physician", and "checkup" are
+ * added here for that reason (not "appointment": too generic -- it also
+ * covers non-health meetings/dates, and its own false positives are not
+ * cheap the way the spec frames consequential ones as being). Every other
+ * oracle-d4i keyword was rechecked for the same gap and judged not to need
+ * an entry here: Saturn's "bills" reads as routine chore/administrative
+ * text ("pay the bills") rather than the spec's money examples (investment,
+ * loan, mortgage, savings, debt -- larger, one-off financial decisions), so
+ * it stays out; Jupiter's "wager" is recreational, not the kind of money
+ * decision spec's examples describe.
  */
 const CONSEQUENTIAL_KEYWORDS: readonly string[] = [
   "health",
@@ -365,6 +432,9 @@ const CONSEQUENTIAL_KEYWORDS: readonly string[] = [
   "medicine",
   "surgery",
   "diagnos",
+  "doctor",
+  "physician",
+  "checkup",
   "money",
   "invest",
   "loan",
@@ -416,6 +486,15 @@ const CONSEQUENTIAL_KEYWORDS: readonly string[] = [
  * unrelated words ("space"/"spare"/"spark...", "restaurant"/"restore"/
  * "result"/"restrict") with no valuable stemmed form worth preserving, so
  * they require a full word match instead of a prefix match.
+ *
+ * oracle-d4i added three more of the `PREFIX_EXCLUDES` kind while broadening
+ * `CATEGORY_KEYWORDS`' real-world coverage: "cardiology"/"cardiologist"
+ * start with "cardio" (Mars' new exercise keyword) but are a medical
+ * context, not a workout; "codeine" and "codependent" both start with
+ * "code" (Mercury's new tech keyword) but are a medication and a
+ * relationship dynamic, neither tech-related; "trivial" starts with
+ * "trivia" (Jupiter's new games-of-chance/learning keyword) but is an
+ * unrelated, very common adjective.
  */
 const PREFIX_EXCLUDES: Readonly<Record<string, readonly string[]>> = {
   sign: ["ificant"], // "significant"
@@ -423,6 +502,9 @@ const PREFIX_EXCLUDES: Readonly<Record<string, readonly string[]>> = {
   plan: ["e", "kton"], // "plane"/"planet"/"planer", "plankton"
   class: ["ic"], // "classic"/"classical"
   invest: ["igat"], // "investigate"/"investigation"
+  cardio: ["log"], // "cardiology"/"cardiologist"
+  code: ["ine", "pendent"], // "codeine", "codependent"
+  trivia: ["l"], // "trivial"
 };
 
 const WHOLE_WORD_KEYWORDS: ReadonlySet<string> = new Set(["spa", "rest"]);

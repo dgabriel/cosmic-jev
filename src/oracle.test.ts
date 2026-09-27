@@ -272,6 +272,180 @@ describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () 
   });
 });
 
+// Regression tests for oracle-d4i: activities with no keyword match at all
+// were misrouted to the vague/needs-detail path, even when clearly
+// categorizable in everyday phrasing. `classifyVague` returns a high
+// probability whenever `categoryMatched` is false, so any gap in
+// CATEGORY_KEYWORDS silently became a false "too vague" recusal.
+describe("StubOracle vague-path false positives (missing everyday-phrasing keywords)", () => {
+  const oracle = new StubOracle();
+
+  it('does not classify "Should I clean my bathroom" as vague (standalone "clean" under Moon)', async () => {
+    const result = await oracle.classify("Should I clean my bathroom");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Moon");
+  });
+
+  it('does not classify "Should I eat some cake" as vague ("cake" under Venus)', async () => {
+    const result = await oracle.classify("Should I eat some cake");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Venus");
+  });
+
+  it('classifies "Take a long shower and a bath before bed" as Moon (self-care)', async () => {
+    const result = await oracle.classify("Take a long shower and a bath before bed");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Moon");
+  });
+
+  it('classifies "Grab a snack at the new restaurant" as Venus (treats/socializing)', async () => {
+    const result = await oracle.classify("Grab a snack at the new restaurant");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Venus");
+  });
+
+  it('classifies "Pay the bills and pick up groceries" as Saturn (chores)', async () => {
+    const result = await oracle.classify("Pay the bills and pick up groceries");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Saturn");
+  });
+
+  it('classifies "Write some code and send a status report" as Mercury (tech/communication)', async () => {
+    const result = await oracle.classify("Write some code and send a status report");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Mercury");
+  });
+
+  it('classifies "Book a cruise and go to a trivia night" as Jupiter (long travel/games of chance)', async () => {
+    const result = await oracle.classify("Book a cruise and go to a trivia night");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Jupiter");
+  });
+
+  it('does not match "cardio" (Mars) inside "cardiologist" (no other keyword in this sentence, so it must fall through to vague)', async () => {
+    const result = await oracle.classify("Went to see my cardiologist for a checkup");
+    expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
+  });
+
+  it('does not match "trivia" (Jupiter) inside "trivial" (no other keyword in this sentence, so it must fall through to vague)', async () => {
+    const result = await oracle.classify("That is a trivial concern");
+    expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
+  });
+
+  it('classifies "Go for a hike this weekend" as Mars ("hike")', async () => {
+    const result = await oracle.classify("Go for a hike this weekend");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Mars");
+  });
+
+  it('classifies "Swim some laps at the pool" as Mars ("swim")', async () => {
+    const result = await oracle.classify("Swim some laps at the pool");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Mars");
+  });
+
+  it('classifies "Enter the local tournament" as Mars ("tournament")', async () => {
+    const result = await oracle.classify("Enter the local tournament");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Mars");
+  });
+
+  it('classifies "Watch a movie tonight" as Venus ("movie")', async () => {
+    const result = await oracle.classify("Watch a movie tonight");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Venus");
+  });
+
+  it('classifies "Go to a concert this weekend" as Venus ("concert")', async () => {
+    const result = await oracle.classify("Go to a concert this weekend");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Venus");
+  });
+
+  it('classifies "Send a message to my team" as Mercury ("message")', async () => {
+    const result = await oracle.classify("Send a message to my team");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Mercury");
+  });
+
+  it('classifies "Take a seminar this weekend" as Jupiter ("seminar")', async () => {
+    const result = await oracle.classify("Take a seminar this weekend");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Jupiter");
+  });
+
+  it('classifies "Place a wager on the game" as Jupiter ("wager")', async () => {
+    const result = await oracle.classify("Place a wager on the game");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Jupiter");
+  });
+
+  it('classifies "Do a few errands today" as Saturn ("errand")', async () => {
+    const result = await oracle.classify("Do a few errands today");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Saturn");
+  });
+
+  it('classifies "Practice for my audition tonight" as Sun ("audition")', async () => {
+    const result = await oracle.classify("Practice for my audition tonight");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Sun");
+  });
+
+  it('classifies "Attend a recital downtown" as Sun ("recital")', async () => {
+    const result = await oracle.classify("Attend a recital downtown");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Sun");
+  });
+
+  it('classifies "Do some public speaking training" as Sun ("public speaking")', async () => {
+    const result = await oracle.classify("Do some public speaking training");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Sun");
+  });
+
+  it('does not match "code" (Mercury) inside "codeine" (no other keyword in this sentence, so it must fall through to vague)', async () => {
+    const result = await oracle.classify("I need to take some codeine for the pain");
+    expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
+  });
+
+  it('does not match "code" (Mercury) inside "codependent" (no other keyword in this sentence, so it must fall through to vague)', async () => {
+    const result = await oracle.classify("We have a codependent relationship");
+    expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
+  });
+});
+
+// Regression tests for the reviewer-flagged oracle-d4i gap: `category` and
+// `consequential` are independent Call 1 signals over the same text, so
+// adding "doctor" to Saturn's CATEGORY_KEYWORDS (a doctor's visit as a
+// chore) did nothing on its own to flag a doctor's-visit activity as
+// consequential. "doctor"/"physician"/"checkup" were added to
+// CONSEQUENTIAL_KEYWORDS so route() still recuses these, regardless of
+// which category they classify into.
+describe("StubOracle consequential coverage for doctor/health-adjacent activities", () => {
+  const oracle = new StubOracle();
+
+  it('scores "Should I go to the doctor for my checkup" as consequential ("doctor"/"checkup")', async () => {
+    const result = await oracle.classify("Should I go to the doctor for my checkup");
+    expect(result.consequential).toBeGreaterThanOrEqual(CONSEQUENTIAL_THRESHOLD);
+  });
+
+  it('recuses "Should I go to the doctor for my checkup" end to end, instead of sailing through to a verdict', async () => {
+    const context: OracleContext = {
+      transits: makeTransitChart(),
+      natal: makeNatalChart(),
+      activityText: "Should I go to the doctor for my checkup",
+    };
+    const outcome = await askOracle(oracle, context);
+    expect(outcome.kind).toBe("recusal");
+  });
+
+  it('scores "See a physician about this" as consequential ("physician")', async () => {
+    const result = await oracle.classify("See a physician about this");
+    expect(result.consequential).toBeGreaterThanOrEqual(CONSEQUENTIAL_THRESHOLD);
+  });
+});
+
 describe("createOracle", () => {
   it("returns a StubOracle for 'stub'", () => {
     expect(createOracle("stub")).toBeInstanceOf(StubOracle);
