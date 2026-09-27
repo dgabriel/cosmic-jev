@@ -277,7 +277,10 @@ describe("createOracle", () => {
     expect(createOracle("stub")).toBeInstanceOf(StubOracle);
   });
 
-  it("throws a clear not-yet-implemented error for 'jev'", () => {
-    expect(() => createOracle("jev")).toThrow(/not yet implemented/i);
+  it("throws a clear configuration error for 'jev' when VITE_WORKER_URL is unset", () => {
+    // src/config.ts's WORKER_URL is undefined in this test run (no
+    // VITE_WORKER_URL configured), so this exercises createOracle's own
+    // guard rather than JevOracle itself (covered in oracle-jev.test.ts).
+    expect(() => createOracle("jev")).toThrow(/VITE_WORKER_URL/);
   });
 });

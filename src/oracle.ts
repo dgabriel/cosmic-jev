@@ -2,8 +2,8 @@
  * Oracle (oracle-cne): the `Oracle` interface (Call 1 classify + Call 2
  * verdict), the consequential/vague routing logic shared by every
  * implementation, and `StubOracle`, a deterministic local stand-in for the
- * real `JevOracle` (oracle-rwy, not yet implemented -- see `createOracle`
- * below, which throws rather than faking one).
+ * real `JevOracle` (oracle-rwy, src/oracle-jev.ts -- see `createOracle`
+ * below, which constructs it for `"jev"`).
  *
  * Reuses sky.ts/aspects.ts/natal.ts types rather than re-inventing chart
  * shapes: `BodyPosition`, `MoonPhaseName`, `TransitBodyName`, `TransitChart`
@@ -17,15 +17,16 @@
  * models only the *shape* of the answers the oracle cares about (a plain
  * probability number and an already-normalized 0-1 "intensity"); the fuller
  * response parsing (confidence, per-option probabilities, request/response
- * wiring to OpenRouter) is oracle-rwy's concern.
+ * wiring to OpenRouter) is oracle-rwy's concern (src/oracle-jev.ts).
  *
  * No LLM-generated or scraped prose anywhere in this module: every output
  * is typed data for oracle-zqz to template into deadpan copy, never text
  * itself.
  */
 import { computeAspects, type Aspect } from "./aspects";
-import type { OracleKind } from "./config";
+import { WORKER_URL, type OracleKind } from "./config";
 import type { NatalChart } from "./natal";
+import { JevOracle } from "./oracle-jev";
 import { TRANSIT_BODIES, type BodyPosition, type MoonPhaseName, type TransitBodyName, type TransitChart } from "./sky";
 
 /**
@@ -602,19 +603,23 @@ export class StubOracle implements Oracle {
 
 /**
  * Constructs the `Oracle` selected by `VITE_ORACLE` (see src/config.ts's
- * `ORACLE_KIND`/`parseOracleKind`). `JevOracle` is oracle-rwy, a separate
- * issue depending on this one and on the deployed Worker -- it does not
- * exist yet, so `"jev"` throws an explicit, honest error rather than a fake
- * implementation (a placeholder `JevOracle` that silently behaved like the
- * stub would be worse than no implementation at all).
+ * `ORACLE_KIND`/`parseOracleKind`). `"jev"` constructs the real `JevOracle`
+ * (oracle-rwy, src/oracle-jev.ts), pointed at the deployed Worker named by
+ * `VITE_WORKER_URL` (src/config.ts's `WORKER_URL`) -- required for "jev"
+ * since there is no sensible default Worker URL to fall back to, but never
+ * read at all for "stub" (the default), so an app running with the stub
+ * oracle never needs it set.
  */
 export function createOracle(kind: OracleKind): Oracle {
   switch (kind) {
     case "stub":
       return new StubOracle();
     case "jev":
-      throw new Error(
-        "JevOracle is not yet implemented (bd oracle-rwy). Set VITE_ORACLE=stub, or implement oracle-rwy first.",
-      );
+      if (WORKER_URL === undefined) {
+        throw new Error(
+          "VITE_ORACLE=jev requires VITE_WORKER_URL to be set to the deployed Cloudflare Worker's URL.",
+        );
+      }
+      return new JevOracle({ workerUrl: WORKER_URL });
   }
 }
