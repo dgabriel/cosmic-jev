@@ -5,6 +5,23 @@
  * Route:  POST /api/decide   body: { state, questions }
  *   - Validates and size-limits the body, then forwards
  *     { model, state, questions } to https://openrouter.ai/api/v1/systemone.
+ *
+ * Route:  GET /api/admin/spend
+ *   - Spend-ledger snapshot for admin.html: rolling-7-day and all-time spend
+ *     per IP bucket. No auth by design (security by obscurity only; see
+ *     docs/jev-openrouter.md). Exempt buckets are omitted from the rows so
+ *     the operator's own IP is not published, but they count into total_usd.
+ *
+ * Spend throttle (see spendLedger.ts): before proxying, the caller's bucket
+ *   (CF-Connecting-IP; IPv6 collapsed to /64) is checked against
+ *   SPEND_CAP_USD_PER_IP in the SPEND_TRACKER Durable Object; at or over the
+ *   rolling 7-day cap the request gets 429 rate_limited without an upstream
+ *   call. After a successful upstream call its exact usage.cost is charged
+ *   via waitUntil (FALLBACK_CHARGE_USD when the reply carries no numeric
+ *   cost). THROTTLE_EXEMPT_IPS buckets skip the check but are still charged.
+ *   A ledger or throttle-config failure answers 503 rather than proxying
+ *   unbilled traffic, and an accounting failure after the upstream call is
+ *   dropped -- the verdict must not fail because the meter did.
  *   - The model comes from the JEV_MODEL var (default typesafe/jev-1.13);
  *     clients cannot choose it, and a `model` field in the body is rejected.
  *   - A successful upstream reply must be a JSON object with an `answers`
@@ -20,8 +37,9 @@
  * Secrets and privacy:
  *   - OPENROUTER_API_KEY is a Worker secret. It is used only in the outbound
  *     Authorization header and is never logged or returned.
- *   - Nothing about the request (birthdates, activity text) is stored or
- *     logged. This file makes no console calls on purpose.
+ *   - Request content (birthdates, activity text) is never stored or logged.
+ *     The spend ledger keeps only the caller's IP-derived bucket, a timestamp
+ *     and a dollar amount. This file makes no console calls on purpose.
  *
  * CORS: ALLOWED_ORIGINS is a comma-separated allowlist of exact origins. The
  * Origin is echoed only when it is on the list (never `*`). A request that
@@ -30,7 +48,35 @@
  * served without CORS headers.
  */
 
-/** Bindings. Hand-written because the project has no @cloudflare/workers-types. */
+import {
+  FALLBACK_CHARGE_USD,
+  SPEND_WINDOW_DAYS,
+  ipBucket,
+  isExemptBucket,
+  parseCap,
+  roundUsd,
+  type LedgerBucket,
+} from "./spendLedger";
+
+/** Hand-written because the project has no @cloudflare/workers-types. */
+
+/** Structural subset of the SPEND_TRACKER Durable Object stub (spendLedger.ts). */
+export interface SpendTrackerStub {
+  fetch(request: Request): Promise<Response>;
+}
+
+/** Structural subset of a Durable Object namespace binding. */
+export interface SpendTrackerNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): SpendTrackerStub;
+}
+
+/** ExecutionContext subset: charge the ledger after the response is sent. */
+export interface ExecutionContextLike {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+/** Bindings. */
 export interface Env {
   /** Secret. Set with `wrangler secret put` or worker/.dev.vars locally. */
   OPENROUTER_API_KEY?: string;
@@ -38,14 +84,30 @@ export interface Env {
   JEV_MODEL?: string;
   /** Non-secret var. Comma-separated exact origins, e.g. "https://a.example,http://localhost:5173". */
   ALLOWED_ORIGINS?: string;
+  /** Durable Object binding. Absent binding = throttle misconfigured = 503. */
+  SPEND_TRACKER?: SpendTrackerNamespace;
+  /** Non-secret var. Rolling-7-day spend cap per IP bucket, e.g. "0.01". */
+  SPEND_CAP_USD_PER_IP?: string;
+  /** Secret. Comma-separated exempt buckets: IPv4 addresses, IPv6 /64 prefixes. */
+  THROTTLE_EXEMPT_IPS?: string;
 }
 
 export const ROUTE = "/api/decide";
+export const ADMIN_ROUTE = "/api/admin/spend";
 export const UPSTREAM_URL = "https://openrouter.ai/api/v1/systemone";
 export const DEFAULT_JEV_MODEL = "typesafe/jev-1.13";
 
-/** Request body cap in bytes. Real bodies are a few KB (chart summary + activity). */
-export const MAX_BODY_BYTES = 32 * 1024;
+/**
+ * Request body cap in bytes. Real bodies are ~1-2 KB (chart summary +
+ * activity); the cap also bounds the worst-case dollars one metered call can
+ * spend between the pre-check and the charge.
+ */
+export const MAX_BODY_BYTES = 8 * 1024;
+
+/** Client-facing message for a self-throttled 429 (distinct from the upstream-
+ * 429 message in upstreamFailure so each is identifiable in tests and logs). */
+export const THROTTLED_MESSAGE =
+  "This network's free cosmic budget for the week is spent. More allowance opens up as last week's charges age out.";
 const MAX_QUESTIONS = 8;
 const MAX_QUESTION_ID_LENGTH = 64;
 /** Limits from docs/jev-openrouter.md. */
@@ -354,8 +416,9 @@ function upstreamFailure(status: number | null, cors: Record<string, string>): R
 /**
  * Reduce an upstream success body to the whitelisted fields, or null if it is
  * not a JSON object with an `answers` object (e.g. a 200 carrying `error`).
+ * Also extracts usage.cost for the spend charge.
  */
-function whitelistUpstream(text: string): string | null {
+function whitelistUpstream(text: string): { body: string; costUsd: number | null } | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -364,19 +427,86 @@ function whitelistUpstream(text: string): string | null {
   }
   if (!isRecord(parsed) || !isRecord(parsed.answers)) return null;
   const { id, model, provider, answers, usage } = parsed;
-  return JSON.stringify({
-    id: typeof id === "string" ? id : undefined,
-    model: typeof model === "string" ? model : undefined,
-    provider: typeof provider === "string" ? provider : undefined,
-    answers,
-    usage: isRecord(usage) ? usage : undefined,
+  const rawCost = isRecord(usage) ? usage.cost : undefined;
+  const costUsd =
+    typeof rawCost === "number" && Number.isFinite(rawCost) && rawCost >= 0 ? rawCost : null;
+  return {
+    body: JSON.stringify({
+      id: typeof id === "string" ? id : undefined,
+      model: typeof model === "string" ? model : undefined,
+      provider: typeof provider === "string" ? provider : undefined,
+      answers,
+      usage: isRecord(usage) ? usage : undefined,
+    }),
+    costUsd,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Spend-ledger wire protocol (spendLedger.ts): JSON over stub.fetch.
+// ---------------------------------------------------------------------------
+
+/** Placeholder origin for requests to the Durable Object; only the path matters. */
+const TRACKER_ORIGIN = "https://spend-tracker.internal";
+
+function trackerRequest(path: string, body?: unknown): Request {
+  return new Request(`${TRACKER_ORIGIN}${path}`, {
+    method: body === undefined ? "GET" : "POST",
+    ...(body === undefined
+      ? {}
+      : {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
   });
 }
 
-export function createHandler(deps: Deps): (request: Request, env: Env) => Promise<Response> {
-  return async (request, env) => {
+async function ledgerWindowSpend(stub: SpendTrackerStub, bucket: string): Promise<number> {
+  const res = await stub.fetch(trackerRequest("/check", { bucket }));
+  if (!res.ok) throw new Error(`ledger check failed: ${res.status}`);
+  const body: unknown = await res.json();
+  const spent = isRecord(body) ? body.spent : undefined;
+  if (typeof spent !== "number" || !Number.isFinite(spent)) {
+    throw new Error("ledger check returned a malformed body");
+  }
+  return spent;
+}
+
+async function ledgerCharge(stub: SpendTrackerStub, bucket: string, usd: number): Promise<void> {
+  const res = await stub.fetch(trackerRequest("/charge", { bucket, usd }));
+  if (!res.ok) throw new Error(`ledger charge failed: ${res.status}`);
+}
+
+async function ledgerSnapshot(stub: SpendTrackerStub): Promise<LedgerBucket[]> {
+  const res = await stub.fetch(trackerRequest("/snapshot"));
+  if (!res.ok) throw new Error(`ledger snapshot failed: ${res.status}`);
+  const body: unknown = await res.json();
+  if (!isRecord(body) || !Array.isArray(body.buckets)) {
+    throw new Error("ledger snapshot returned a malformed body");
+  }
+  return (body.buckets as Array<Partial<LedgerBucket>>).map((b, i) => {
+    if (
+      typeof b.bucket !== "string" ||
+      typeof b.spend7dUsd !== "number" ||
+      typeof b.totalUsd !== "number"
+    ) {
+      throw new Error(`ledger snapshot row ${i} is malformed`);
+    }
+    return {
+      bucket: b.bucket,
+      spend7dUsd: b.spend7dUsd,
+      totalUsd: b.totalUsd,
+      lastChargeMs: typeof b.lastChargeMs === "number" ? b.lastChargeMs : null,
+    };
+  });
+}
+
+export function createHandler(
+  deps: Deps,
+): (request: Request, env: Env, ctx?: ExecutionContextLike) => Promise<Response> {
+  return async (request, env, ctx) => {
     try {
-      return await handle(deps, request, env);
+      return await handle(deps, request, env, ctx);
     } catch {
       // Unexpected failure (e.g. the body stream aborted). No exception text is returned.
       const origin = request.headers.get("Origin");
@@ -389,11 +519,18 @@ export function createHandler(deps: Deps): (request: Request, env: Env) => Promi
   };
 }
 
-async function handle(deps: Deps, request: Request, env: Env): Promise<Response> {
+async function handle(
+  deps: Deps,
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContextLike,
+): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname !== ROUTE) {
+  const route = url.pathname === ROUTE ? "decide" : url.pathname === ADMIN_ROUTE ? "admin" : null;
+  if (route === null) {
     return errorResponse(404, "not_found", "Not found.");
   }
+  const methods = route === "decide" ? "POST, OPTIONS" : "GET, OPTIONS";
 
   const origin = request.headers.get("Origin");
   let cors: Record<string, string> = {};
@@ -408,17 +545,19 @@ async function handle(deps: Deps, request: Request, env: Env): Promise<Response>
     if (origin === null) return respond(204, null);
     return respond(204, null, {
       ...cors,
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": methods,
       "Access-Control-Allow-Headers": "Content-Type",
       "Access-Control-Max-Age": "86400",
     });
   }
-  if (request.method !== "POST") {
-    return errorResponse(405, "method_not_allowed", "Use POST.", {
+  if (request.method !== (route === "decide" ? "POST" : "GET")) {
+    return errorResponse(405, "method_not_allowed", route === "decide" ? "Use POST." : "Use GET.", {
       ...cors,
-      Allow: "POST, OPTIONS",
+      Allow: methods,
     });
   }
+
+  if (route === "admin") return handleAdmin(env, cors);
 
   const apiKey = env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) {
@@ -447,6 +586,29 @@ async function handle(deps: Deps, request: Request, env: Env): Promise<Response>
     return errorResponse(400, "invalid_request", validated.message, cors);
   }
 
+  // --- Spend throttle (see the file header). Fail-closed on any ledger or
+  // config problem: this feature exists to protect real money. The check is
+  // skipped for exempt buckets, but they are still charged below.
+  const bucket = ipBucket(request.headers.get("CF-Connecting-IP"));
+  const exempt = isExemptBucket(bucket, env.THROTTLE_EXEMPT_IPS);
+  const cap = parseCap(env.SPEND_CAP_USD_PER_IP);
+  const tracker = env.SPEND_TRACKER;
+  const stub = tracker !== undefined ? tracker.get(tracker.idFromName("ledger")) : null;
+  if (stub === null || cap === null) {
+    return errorResponse(503, "unavailable", "The oracle is unavailable right now.", cors);
+  }
+  if (!exempt) {
+    let spent: number;
+    try {
+      spent = await ledgerWindowSpend(stub, bucket);
+    } catch {
+      return errorResponse(503, "unavailable", "The oracle is unavailable right now.", cors);
+    }
+    if (spent >= cap) {
+      return errorResponse(429, "rate_limited", THROTTLED_MESSAGE, cors);
+    }
+  }
+
   const model = env.JEV_MODEL?.trim() || DEFAULT_JEV_MODEL;
   const payload = JSON.stringify({
     model,
@@ -459,5 +621,50 @@ async function handle(deps: Deps, request: Request, env: Env): Promise<Response>
 
   const answer = whitelistUpstream(upstream.text);
   if (answer === null) return upstreamFailure(null, cors);
-  return respond(200, answer, cors);
+  const charging = ledgerCharge(stub, bucket, answer.costUsd ?? FALLBACK_CHARGE_USD).catch(
+    () => undefined, // a meter failure must not fail the verdict
+  );
+  if (ctx !== undefined) ctx.waitUntil(charging);
+  else await charging; // tests and non-Workers runtimes observe the write
+  return respond(200, answer.body, cors);
+}
+
+/**
+ * GET /api/admin/spend: the ledger snapshot behind admin.html. Unmetered
+ * (it spends nothing). Exempt buckets are filtered out of the rows -- the
+ * whole point of the exemption list being a secret is that it names the
+ * operator's IPs -- but their dollars still count in total_usd.
+ */
+async function handleAdmin(env: Env, cors: Record<string, string>): Promise<Response> {
+  const tracker = env.SPEND_TRACKER;
+  const stub = tracker !== undefined ? tracker.get(tracker.idFromName("ledger")) : null;
+  const unavailable = () =>
+    errorResponse(503, "unavailable", "The oracle is unavailable right now.", cors);
+  if (stub === null) return unavailable();
+  const nowMs = Date.now();
+  let buckets: LedgerBucket[];
+  try {
+    buckets = await ledgerSnapshot(stub);
+  } catch {
+    return unavailable();
+  }
+  const visible = buckets
+    .filter((b) => !isExemptBucket(b.bucket, env.THROTTLE_EXEMPT_IPS))
+    .sort((a, b) => b.spend7dUsd - a.spend7dUsd || a.bucket.localeCompare(b.bucket));
+  return respond(
+    200,
+    JSON.stringify({
+      window_days: SPEND_WINDOW_DAYS,
+      cap_usd: parseCap(env.SPEND_CAP_USD_PER_IP),
+      generated_at: new Date(nowMs).toISOString(),
+      total_usd: roundUsd(buckets.reduce((sum, b) => sum + b.totalUsd, 0)),
+      buckets: visible.map((b) => ({
+        bucket: b.bucket,
+        spend_7d_usd: b.spend7dUsd,
+        total_usd: b.totalUsd,
+        last_charge_at: b.lastChargeMs === null ? null : new Date(b.lastChargeMs).toISOString(),
+      })),
+    }),
+    cors,
+  );
 }

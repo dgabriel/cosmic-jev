@@ -15,6 +15,8 @@
   --color-error-bg: #fdecea;
   --color-error-fg: #7a1f14;
   --color-pending-fg: #5b5b5b;
+  --color-disclaimer-bg: #fdf6e3;
+  --color-disclaimer-fg: #6b5300;
   --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -29,6 +31,8 @@
     --color-error-bg: #3a1613;
     --color-error-fg: #ffb4a8;
     --color-pending-fg: #b7b3c2;
+    --color-disclaimer-bg: #332a0d;
+    --color-disclaimer-fg: #f0d878;
   }
 }
 
@@ -198,4 +202,50 @@ button[type="submit"]:hover {
 .verdict-explanation {
   margin: 0;
   text-align: left;
+}
+
+.verdict-disclaimer {
+  margin: 0.75rem 0 0;
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--color-disclaimer-fg);
+  background: var(--color-disclaimer-bg);
+  border-radius: 0.35rem;
+}
+
+/* Spend ledger (admin.html) */
+
+.ledger-summary {
+  margin: 1.25rem 0 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-table {
+  width: 100%;
+  margin-top: 1rem;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.ledger-table th,
+.ledger-table td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ledger-table thead th {
+  color: var(--color-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ledger-table th.num,
+.ledger-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }

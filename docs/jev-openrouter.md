@@ -114,3 +114,32 @@ client.
 - The OpenRouter key lives only in a Worker secret (`OPENROUTER_API_KEY`).
 - Call 2 batches the Noul verdict and Score intensity in a single request.
 - The client `JevOracle` talks to our Worker, never to OpenRouter directly.
+
+## Spend throttle and admin endpoint (Worker-side)
+
+Not OpenRouter behavior; our own layer on top of it.
+
+- Each `POST /api/decide` caller is bucketed by `CF-Connecting-IP` (IPv6
+  collapses to its `/64` prefix; a missing or malformed header shares the
+  capped `unknown` bucket). Before proxying, the Worker checks the bucket's
+  **rolling 7-day** spend against `SPEND_CAP_USD_PER_IP` (default `0.01`) in
+  the `SPEND_TRACKER` Durable Object (`worker/spendLedger.ts`, SQLite-backed,
+  free-plan eligible). At or over the cap: **429 `rate_limited`** (a
+  distinct, worker-generated message — upstream 429s read "The oracle is
+  busy…") with no upstream call.
+- After a successful upstream reply the Worker charges the reply's exact
+  `usage.cost` to the bucket via `waitUntil`; a reply with no numeric cost
+  charges a conservative fallback ($0.0001). Upstream failures charge
+  nothing. Ledger or throttle-config failures answer **503 rather than
+  proxying unbilled traffic** (fail-closed).
+- `THROTTLE_EXEMPT_IPS` (Worker **secret** — it names the operator's IPs):
+  comma-separated IPv4 addresses and IPv6 `/64` prefixes. Exempt buckets skip
+  enforcement but are still metered.
+- `GET /api/admin/spend` returns
+  `{ window_days, cap_usd, generated_at, total_usd, buckets: [{ bucket, spend_7d_usd, total_usd, last_charge_at }] }`,
+  same origin allowlist, unmetered. Exempt buckets are omitted from `buckets`
+  (so the operator's IPs are never published) but counted in `total_usd`.
+  `admin.html` (a second, unlinked page of the FE build) renders this JSON.
+  **It has no auth**: the URL obscurity is the only "gate", and anyone who
+  finds it can read bucketed IPs and spend. The OpenRouter key credit limit
+  remains the real backstop.

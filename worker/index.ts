@@ -1,10 +1,15 @@
 /**
  * Worker entry point. A Cloudflare module Worker's entry file may export only
- * handlers and classes, so this file has a default export and nothing else.
- * All logic and every named export (for tests) live in ./handler.ts. See that
- * file's header for the route, CORS, retry and privacy behavior.
+ * handlers and classes, so this file holds the default fetch handler and the
+ * SpendLedger Durable Object class, and nothing else. All logic and every
+ * named export (for tests) live in ./handler.ts and ./spendLedger.ts; see
+ * those files' headers for route, CORS, retry, throttle and privacy behavior.
+ * Cloudflare calls fetch(request, env, ctx); ctx flows through createHandler
+ * so the meter can be charged after the response is sent.
  */
 import { createHandler } from "./handler";
+
+export { SpendLedger } from "./spendLedger";
 
 export default {
   fetch: createHandler({

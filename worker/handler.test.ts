@@ -1,26 +1,116 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_ROUTE,
   DEFAULT_JEV_MODEL,
   MAX_ATTEMPTS,
   MAX_BODY_BYTES,
   RETRY_BASE_DELAY_MS,
   ROUTE,
+  THROTTLED_MESSAGE,
   UPSTREAM_TIMEOUT_MS,
   UPSTREAM_URL,
   createHandler,
   type Env,
+  type SpendTrackerNamespace,
+  type SpendTrackerStub,
 } from "./handler";
+import { FALLBACK_CHARGE_USD, mergeLedger } from "./spendLedger";
 
 // A fake key, used only to prove the Worker never leaks whatever key it holds.
 const KEY = "sk-or-test-FAKE-KEY-must-never-leak";
 const APP_ORIGIN = "https://dgabriel.github.io";
 const DEV_ORIGIN = "http://localhost:5173";
 const URL_ = `https://worker.test${ROUTE}`;
+const ADMIN_URL = `https://worker.test${ADMIN_ROUTE}`;
+
+// --- fake SPEND_TRACKER namespaces (structural; spendLedger.ts logic has its own tests) ---
+
+interface FakeCharge {
+  bucket: string;
+  usd: number;
+  nowMs: number;
+}
+
+interface FakeTrackerStub extends SpendTrackerStub {
+  charges: FakeCharge[];
+  /** Make /check start failing, to prove the handler fails closed. */
+  breakChecks(): void;
+  /** Push a raw charge with a chosen timestamp (for admin snapshot tests). */
+  seed(bucket: string, usd: number, nowMs: number): void;
+}
+
+/**
+ * An in-memory spend tracker speaking the real wire protocol (JSON over
+ * fetch, like spendLedger.ts's DO). With `realSums` true, /check sums every
+ * charge for the bucket (the rolling-window SQL itself is covered by
+ * spendLedger.test.ts); with false it always reports 0 so the throttle can
+ * never fire -- used for the shared ENV so spend accumulation across the
+ * suite can never 429 an unrelated test.
+ */
+function fakeSpendTracker(realSums = true): {
+  namespace: SpendTrackerNamespace;
+  stub: FakeTrackerStub;
+} {
+  const charges: FakeCharge[] = [];
+  let checksBroken = false;
+  const stub: FakeTrackerStub = {
+    charges,
+    breakChecks: () => {
+      checksBroken = true;
+    },
+    seed: (bucket, usd, nowMs) => {
+      charges.push({ bucket, usd, nowMs });
+    },
+    async fetch(request: Request): Promise<Response> {
+      const { pathname } = new URL(request.url);
+      if (request.method === "POST" && pathname === "/check") {
+        if (checksBroken) return new Response("down", { status: 503 });
+        const body = (await request.json()) as { bucket: string };
+        const sum = realSums
+          ? charges.filter((c) => c.bucket === body.bucket).reduce((s, c) => s + c.usd, 0)
+          : 0;
+        return Response.json({ spent: sum });
+      }
+      if (request.method === "POST" && pathname === "/charge") {
+        const body = (await request.json()) as { bucket: string; usd: number };
+        charges.push({ bucket: body.bucket, usd: body.usd, nowMs: Date.now() });
+        return new Response(null, { status: 204 });
+      }
+      if (request.method === "GET" && pathname === "/snapshot") {
+        const byBucket = new Map<string, { total: number; last: number }>();
+        for (const c of charges) {
+          const e = byBucket.get(c.bucket) ?? { total: 0, last: 0 };
+          e.total = Math.round((e.total + c.usd) * 1e8) / 1e8;
+          e.last = Math.max(e.last, c.nowMs);
+          byBucket.set(c.bucket, e);
+        }
+        const chargeRows = [...byBucket].map(([bucket, e]) => ({
+          bucket,
+          chargesTotal: e.total,
+          windowTotal: e.total,
+          lastMs: e.last,
+        }));
+        return Response.json({ buckets: mergeLedger([], chargeRows) });
+      }
+      return new Response("not found", { status: 404 });
+    },
+  };
+  return { namespace: { idFromName: (name: string) => name, get: () => stub }, stub };
+}
+
+/** The first recorded charge, or a thrown test error if none was recorded. */
+function firstCharge(tracker: ReturnType<typeof fakeSpendTracker>): FakeCharge {
+  const charge = tracker.stub.charges[0];
+  if (charge === undefined) throw new Error("expected a recorded charge");
+  return charge;
+}
 
 const ENV: Env = {
   OPENROUTER_API_KEY: KEY,
   JEV_MODEL: "typesafe/jev-1.13",
   ALLOWED_ORIGINS: `${APP_ORIGIN},${DEV_ORIGIN}`,
+  // Never-throttles, so the throttle is inert unless a test installs its own.
+  SPEND_TRACKER: fakeSpendTracker(false).namespace,
 };
 
 // Response shape per docs/jev-openrouter.md ("Response"): id, model, provider,
@@ -823,4 +913,282 @@ describe("secrecy", () => {
       expect(headerText(res).toLowerCase()).not.toContain(ACTIVITY_TEXT);
     },
   );
+});
+
+// ---------------------------------------------------------------------------
+// Spend throttle (POST /api/decide): check-then-charge against the ledger
+// ---------------------------------------------------------------------------
+
+describe("spend throttle", () => {
+  const IP = "203.0.113.7";
+
+  const throttledEnv = (
+    namespace: SpendTrackerNamespace,
+    overrides: Partial<Env> = {},
+  ): Env => ({
+    ...ENV,
+    SPEND_TRACKER: namespace,
+    // One mocked 0.00001 call fits; the next check sees spend >= cap.
+    SPEND_CAP_USD_PER_IP: "0.00001",
+    ...overrides,
+  });
+
+  it("charges the caller's bucket the exact usage.cost after a success", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler } = setup([jsonRes(200, UPSTREAM_OK)]); // usage.cost = 0.00001
+    const res = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": IP }),
+      throttledEnv(tracker.namespace),
+    );
+    expect(res.status).toBe(200);
+    expect(tracker.stub.charges).toHaveLength(1);
+    expect(firstCharge(tracker).bucket).toBe(IP);
+    expect(firstCharge(tracker).usd).toBe(0.00001);
+  });
+
+  it("429s at the cap without touching upstream, with the throttle-specific message", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler, calls } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const env = throttledEnv(tracker.namespace);
+    const first = await handler(post(VALID_BODY, { "CF-Connecting-IP": IP }), env);
+    expect(first.status).toBe(200);
+    const second = await handler(post(VALID_BODY, { "CF-Connecting-IP": IP }), env);
+    expect(second.status).toBe(429);
+    expect(await readJson(second)).toEqual({
+      error: { code: "rate_limited", message: THROTTLED_MESSAGE },
+    });
+    expect(await second.clone().text()).not.toContain(KEY);
+    expect(calls).toHaveLength(1); // the second request never reached upstream
+  });
+
+  it("buckets IPv6 by /64: two addresses in one prefix share one budget", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const env = throttledEnv(tracker.namespace);
+    const first = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": "2001:db8:1234:abcd::1" }),
+      env,
+    );
+    expect(first.status).toBe(200);
+    expect(firstCharge(tracker).bucket).toBe("2001:0db8:1234:abcd::/64");
+    const second = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": "2001:db8:1234:abcd:ffff::9" }),
+      env,
+    );
+    expect(second.status).toBe(429);
+  });
+
+  it("exempt buckets skip the check but are still charged", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler, calls } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const env = throttledEnv(tracker.namespace, {
+      THROTTLE_EXEMPT_IPS: IP,
+      SPEND_CAP_USD_PER_IP: "0.000005", // one call would already exceed it
+    });
+    for (let i = 0; i < 3; i++) {
+      const res = await handler(post(VALID_BODY, { "CF-Connecting-IP": IP }), env);
+      expect(res.status).toBe(200);
+    }
+    expect(calls).toHaveLength(3);
+    expect(tracker.stub.charges).toHaveLength(3); // metered even though uncapped
+  });
+
+  it("missing CF-Connecting-IP lands in the capped 'unknown' bucket", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const env = throttledEnv(tracker.namespace);
+    const req = new Request(URL_, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: APP_ORIGIN },
+      body: JSON.stringify(VALID_BODY),
+    });
+    const res = await handler(req, env);
+    expect(res.status).toBe(200);
+    expect(firstCharge(tracker).bucket).toBe("unknown");
+  });
+
+  it("a success without a numeric usage.cost is charged the fallback amount", async () => {
+    const tracker = fakeSpendTracker();
+    const noCost = { ...UPSTREAM_OK, usage: { input_tokens: 10, output_tokens: 2 } };
+    const { handler } = setup([jsonRes(200, noCost)]);
+    const res = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": IP }),
+      throttledEnv(tracker.namespace),
+    );
+    expect(res.status).toBe(200);
+    expect(firstCharge(tracker).usd).toBe(FALLBACK_CHARGE_USD);
+  });
+
+  it("an upstream failure charges nothing", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler, calls } = setup([jsonRes(500)]);
+    const res = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": IP }),
+      throttledEnv(tracker.namespace),
+    );
+    expect(res.status).toBe(502);
+    expect(calls).toHaveLength(MAX_ATTEMPTS); // retry behavior unchanged
+    expect(tracker.stub.charges).toHaveLength(0);
+  });
+
+  it("fails closed (503, no upstream call) when the ledger errors", async () => {
+    const tracker = fakeSpendTracker();
+    tracker.stub.breakChecks();
+    const { handler, calls } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const res = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": IP }),
+      throttledEnv(tracker.namespace),
+    );
+    expect(res.status).toBe(503);
+    expect(await errorCode(res)).toBe("unavailable");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("fails closed when the binding or the cap is misconfigured", async () => {
+    const { handler, calls } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const noBinding = await handler(post(VALID_BODY), { ...ENV, SPEND_TRACKER: undefined });
+    expect(noBinding.status).toBe(503);
+    const badCap = await handler(
+      post(VALID_BODY),
+      throttledEnv(fakeSpendTracker().namespace, { SPEND_CAP_USD_PER_IP: "banana" }),
+    );
+    expect(badCap.status).toBe(503);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("charges via waitUntil when an execution context is present", async () => {
+    const tracker = fakeSpendTracker();
+    const { handler } = setup([jsonRes(200, UPSTREAM_OK)]);
+    let awaited: Promise<unknown> | undefined;
+    const ctx = {
+      waitUntil: (p: Promise<unknown>) => {
+        awaited = p;
+      },
+    };
+    const res = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": IP }),
+      throttledEnv(tracker.namespace),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    expect(awaited).toBeDefined();
+    await awaited;
+    expect(tracker.stub.charges).toHaveLength(1);
+  });
+
+  it("a meter failure after a success still returns the verdict", async () => {
+    const tracker = fakeSpendTracker();
+    const brokenCharge: FakeTrackerStub = {
+      ...tracker.stub,
+      fetch: (request: Request) =>
+        new URL(request.url).pathname === "/charge"
+          ? Promise.resolve(new Response("down", { status: 503 }))
+          : tracker.stub.fetch(request),
+    };
+    const namespace: SpendTrackerNamespace = { idFromName: (n: string) => n, get: () => brokenCharge };
+    const { handler } = setup([jsonRes(200, UPSTREAM_OK)]);
+    const res = await handler(
+      post(VALID_BODY, { "CF-Connecting-IP": IP }),
+      throttledEnv(namespace),
+    );
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/admin/spend
+// ---------------------------------------------------------------------------
+
+describe("admin spend snapshot", () => {
+  interface SnapshotBody {
+    window_days: number;
+    cap_usd: number | null;
+    generated_at: string;
+    total_usd: number;
+    buckets: Array<{
+      bucket: string;
+      spend_7d_usd: number;
+      total_usd: number;
+      last_charge_at: string | null;
+    }>;
+  }
+
+  const getAdmin = (headers: Record<string, string> = {}) =>
+    new Request(ADMIN_URL, { method: "GET", headers: { Origin: APP_ORIGIN, ...headers } });
+
+  it("lists buckets by 7-day spend, omits exempt rows, and counts them in the total", async () => {
+    const tracker = fakeSpendTracker();
+    tracker.stub.seed("203.0.113.7", 0.00001, 1760000000000);
+    tracker.stub.seed("203.0.113.8", 0.00002, 1760000000001);
+    tracker.stub.seed("10.9.8.7", 0.007, 1760000000002);
+    const env: Env = {
+      ...ENV,
+      SPEND_TRACKER: tracker.namespace,
+      THROTTLE_EXEMPT_IPS: "10.9.8.7",
+    };
+    const { handler } = setup([]);
+    const res = await handler(getAdmin(), env);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(APP_ORIGIN);
+    const body = (await readJson(res)) as SnapshotBody;
+    expect(body.window_days).toBe(7);
+    expect(body.cap_usd).toBe(0.01);
+    expect(typeof body.generated_at).toBe("string");
+    expect(body.total_usd).toBe(0.00703); // includes the exempt bucket's 0.007
+    expect(body.buckets).toEqual([
+      {
+        bucket: "203.0.113.8",
+        spend_7d_usd: 0.00002,
+        total_usd: 0.00002,
+        last_charge_at: new Date(1760000000001).toISOString(),
+      },
+      {
+        bucket: "203.0.113.7",
+        spend_7d_usd: 0.00001,
+        total_usd: 0.00001,
+        last_charge_at: new Date(1760000000000).toISOString(),
+      },
+    ]);
+    expect(JSON.stringify(body)).not.toContain("10.9.8.7"); // exempt IP never published
+  });
+
+  it("serves a request with no Origin header (curl) without CORS headers", async () => {
+    const tracker = fakeSpendTracker();
+    tracker.stub.seed("203.0.113.7", 0.00001, 1760000000000);
+    const { handler } = setup([]);
+    const res = await handler(
+      new Request(ADMIN_URL, { method: "GET" }),
+      { ...ENV, SPEND_TRACKER: tracker.namespace },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+
+  it("rejects a non-allowlisted Origin and non-GET methods, preflights like decide", async () => {
+    const { handler } = setup([]);
+    const evil = await handler(new Request(ADMIN_URL, { method: "GET", headers: { Origin: "https://evil.example" } }), ENV);
+    expect(evil.status).toBe(403);
+    const posted = await handler(new Request(ADMIN_URL, { method: "POST", headers: { Origin: APP_ORIGIN } }), ENV);
+    expect(posted.status).toBe(405);
+    expect(posted.headers.get("Allow")).toBe("GET, OPTIONS");
+    const preflight = await handler(new Request(ADMIN_URL, { method: "OPTIONS", headers: { Origin: APP_ORIGIN } }), ENV);
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Methods")).toBe("GET, OPTIONS");
+  });
+
+  it("is 503 (not a leak) when the binding is missing", async () => {
+    const { handler } = setup([]);
+    const res = await handler(getAdmin(), { ...ENV, SPEND_TRACKER: undefined });
+    expect(res.status).toBe(503);
+    expect(await readJson(res)).toEqual(GENERIC.unavailable);
+  });
+
+  it("does not touch upstream and contains no key material", async () => {
+    const tracker = fakeSpendTracker();
+    tracker.stub.seed("203.0.113.7", 0.00001, 1760000000000);
+    const { handler, calls } = setup([]);
+    const res = await handler(getAdmin(), { ...ENV, SPEND_TRACKER: tracker.namespace });
+    expect(calls).toHaveLength(0);
+    expect(await res.clone().text()).not.toContain(KEY);
+  });
 });
