@@ -384,6 +384,19 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
     "concert",
     "spa",
     "friend",
+    // Reported gap: "Should I eat lamb"/"...eat a lamb" matched nothing at
+    // all (no category had any eating/food keyword), so classifyVague's
+    // "nothing matched" branch wrongly called it too vague. Added here, not
+    // to Moon: Moon comes before Venus in TRANSIT_BODIES, and pickCategory
+    // only replaces a leading match on a *strictly greater* count, so adding
+    // "eat" to Moon would have turned "Should I eat some cake" (the
+    // oracle-d4i regression test two lines below) into a 1-1 tie that Moon
+    // wins by iteration order -- silently flipping that test's expected
+    // Venus result. Putting it here instead makes that same phrase resolve
+    // to Venus even more clearly (2 matches, not a tie).
+    "eat",
+    "meal",
+    "food",
   ],
   Mercury: [
     "communicat",

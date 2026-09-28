@@ -470,7 +470,16 @@ export class JevOracle implements Oracle {
 
   constructor(options: JevOracleOptions) {
     this.workerUrl = options.workerUrl.replace(/\/+$/, "");
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // `.bind(globalThis)`, not a bare `fetch` reference: `fetch` is a
+    // brand-checked native method that throws "Illegal invocation" if called
+    // with a `this` other than its own global scope -- storing it as
+    // `this.fetchImpl` and later calling `this.fetchImpl(...)` does exactly
+    // that (invokes it with `this` bound to the `JevOracle` instance).
+    // main.ts/sequencer.ts never hit this (a normal browser Window tolerates
+    // it), but it reproduces reliably in a Service Worker global scope --
+    // found via the Eventbrite extension's background.ts, the first
+    // Service-Worker caller of this class.
+    this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
   }
 
   async classify(activityText: string): Promise<ClassificationResult> {

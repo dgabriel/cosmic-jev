@@ -336,6 +336,18 @@ describe("StubOracle vague-path false positives (missing everyday-phrasing keywo
     expect(result.category).toBe("Venus");
   });
 
+  it('does not classify "Should I eat lamb" as vague ("eat" under Venus)', async () => {
+    const result = await oracle.classify("Should I eat lamb");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Venus");
+  });
+
+  it('does not classify "Should I eat a lamb" as vague ("eat" under Venus)', async () => {
+    const result = await oracle.classify("Should I eat a lamb");
+    expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
+    expect(result.category).toBe("Venus");
+  });
+
   it('classifies "Take a long shower and a bath before bed" as Moon (self-care)', async () => {
     const result = await oracle.classify("Take a long shower and a bath before bed");
     expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
