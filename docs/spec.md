@@ -85,7 +85,9 @@ Routing, in this priority order:
   probability shown, and nothing else in the routing can override this into
   a verdict.
 - `safety`, `legal` → same recusal, no exceptions.
-- vague p ≥ 0.6 → ask the user to be more specific
+- vague p ≥ 0.75 → ask the user to be more specific (raised from the
+  original 0.6: real Jev scored ordinary activities like "Should I have a
+  party tonight" ~0.68-0.70, above 0.6, with no real ambiguity to clarify)
 - `health`, `money`, `relationship_ending`, `job_quitting` → Call 2, and
   show the verdict together with a visible "this is not real advice"
   disclaimer; keep the tone light

@@ -135,17 +135,24 @@ export interface Oracle {
 }
 
 /**
- * Vague routing threshold from docs/spec.md section 2. This is a safety
- * feature (vague activities get asked to clarify instead of a guess) -- do
- * not change it without checking with the project owner first.
+ * Vague routing threshold. This is a safety feature (vague activities get
+ * asked to clarify instead of a guess) -- do not change it without checking
+ * with the project owner first.
  *
  * The old scalar `CONSEQUENTIAL_THRESHOLD` (p >= 0.3) is retired as of
  * oracle-2au: `route` below now switches on `SensitivityCategory` buckets
  * instead of a single probability, per explicit user-directed policy change
  * (overriding the prior "do not change thresholds without asking" note for
- * that constant specifically -- `VAGUE_THRESHOLD` is unchanged).
+ * that constant specifically -- `VAGUE_THRESHOLD` is unchanged at the time).
+ *
+ * Raised from docs/spec.md section 2's original 0.6 to 0.75, per explicit
+ * project-owner direction: real Jev (typesafe/jev-1.13) consistently scored
+ * plain, ordinary activities like "Should I have a party tonight" around
+ * 0.68-0.70 vague, well above 0.6, sending them to "needs-detail" when they
+ * didn't need clarifying. Confirmed via direct requests against the deployed
+ * Worker before changing this. `docs/spec.md` is updated to match.
  */
-export const VAGUE_THRESHOLD = 0.6;
+export const VAGUE_THRESHOLD = 0.75;
 
 /** Why a `RoutingDecision` recused -- internal-only (tests/telemetry); the user-facing message stays generic either way (see explain.ts's `RECUSAL_MESSAGE`). */
 export type RecusalReason = "violence_person" | "safety" | "legal";
