@@ -8,8 +8,12 @@
 # Node / build output
 node_modules/
 dist/
+extension/dist/
 .wrangler/
 .dev.vars
+
+# macOS
+.DS_Store
 
 # Local env / secrets (Vite loads .env* into VITE_ vars; never commit keys)
 .env
