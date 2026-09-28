@@ -1,0 +1,38 @@
+/*
+ * Glow states applied by content.ts. `!important` throughout: these need to
+ * win against Eventbrite's own outline/box-shadow rules (e.g. its own hover
+ * states), not just add alongside them.
+ */
+
+[data-testid="search-event"] {
+  transition: box-shadow 300ms ease, outline-color 300ms ease;
+  border-radius: 8px;
+}
+
+.cosmic-jev-glow-pending {
+  outline: 2px dotted rgba(255, 255, 255, 0.35) !important;
+  outline-offset: 2px;
+}
+
+.cosmic-jev-glow-green {
+  outline: 3px solid #2ecc71 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 18px 4px rgba(46, 204, 113, 0.65) !important;
+}
+
+.cosmic-jev-glow-red {
+  outline: 3px solid #e74c3c !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 18px 4px rgba(231, 76, 60, 0.65) !important;
+}
+
+.cosmic-jev-glow-neutral {
+  outline: 2px dashed rgba(255, 255, 255, 0.3) !important;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="search-event"] {
+    transition: none;
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Cosmic JEV for Eventbrite",
+  "version": "0.1.0",
+  "description": "Glows event cards on Eventbrite green or red based on what the stars say about attending, per your birth chart.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtjaSg4PXHjWtPckG6PeeOfNWbo8hLVxX/n0ScPD9MTShTO52FsZ01EMojmK1cv+hfYW8fnjeqJa4bCPfEtN6XLS3uy2stqw5tvpC/bd/V5fUIZnTDPhTmqcJnNtgee6Z6JQYnzEuC08Zo3VOBQedaCWIYc3vqsuQWCwJjO2hDGieb8AOP7TbI7Y1/hqKNz0aUyyb9hA/Xw3o7dimT2/5C8v+yNzCsNYjgBVRZOsWqNgvYA5img+izuh8BEYQ2+bYB20vh//A1fv0lOwjqgsIh6CeOUy65SCu+FrDymmO4QWCuKam30cATUwcN1msqLd61I1i7UO06afmK4B3xeTeAQIDAQAB",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.eventbrite.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://www.eventbrite.com/*",
+    "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/*"
+  ],
+  "permissions": ["storage"]
+}

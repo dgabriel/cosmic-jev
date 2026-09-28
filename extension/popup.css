@@ -1,0 +1,97 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  width: 20rem;
+  padding: 1rem;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #14131a;
+  color: #eeeeec;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.tagline {
+  margin: 0 0 1rem;
+  color: #b7b3c2;
+  font-size: 0.8rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.field-row .field {
+  flex: 1;
+}
+
+label {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+  background: #1e1c29;
+  border: 1px solid #39374a;
+  border-radius: 0.3rem;
+  padding: 0.4rem 0.5rem;
+}
+
+details {
+  border: 1px solid #39374a;
+  border-radius: 0.3rem;
+  padding: 0.5rem 0.6rem;
+}
+
+details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+details .field,
+details .field-row {
+  margin-top: 0.6rem;
+}
+
+button[type="submit"] {
+  font: inherit;
+  font-weight: 600;
+  color: #14131a;
+  background: #b6a6ff;
+  border: none;
+  border-radius: 0.3rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+button[type="submit"]:hover {
+  filter: brightness(1.08);
+}
+
+#status {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.85rem;
+  color: #b6a6ff;
+}
