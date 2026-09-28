@@ -58,32 +58,19 @@ function makeVerdictOutcome(overrides: Partial<Extract<OracleOutcome, { kind: "v
 }
 
 describe("firmnessFor", () => {
-  it("is Tentatively exactly at 0.5", () => {
+  it("is Tentatively within the distance threshold of 0.5, Firmly beyond it", () => {
     expect(firmnessFor(0.5)).toBe("Tentatively");
-  });
-
-  it("is Tentatively just inside the distance threshold", () => {
     expect(firmnessFor(0.5 + FIRMNESS_DISTANCE_THRESHOLD - 0.01)).toBe("Tentatively");
     expect(firmnessFor(0.5 - FIRMNESS_DISTANCE_THRESHOLD + 0.01)).toBe("Tentatively");
-  });
-
-  it("is Firmly exactly at the distance threshold and beyond", () => {
     expect(firmnessFor(0.7)).toBe("Firmly");
     expect(firmnessFor(0.3)).toBe("Firmly");
-    expect(firmnessFor(0.81)).toBe("Firmly");
-    expect(firmnessFor(0.19)).toBe("Firmly");
   });
 });
 
 describe("emojiFor", () => {
-  it("is a thumbs-up at and above 0.5", () => {
+  it("is a thumbs-up at and above 0.5, thumbs-down below it", () => {
     expect(emojiFor(0.5)).toBe("👍");
-    expect(emojiFor(0.81)).toBe("👍");
-  });
-
-  it("is a thumbs-down below 0.5", () => {
     expect(emojiFor(0.49)).toBe("👎");
-    expect(emojiFor(0.1)).toBe("👎");
   });
 });
 
@@ -162,37 +149,30 @@ describe("explainVerdict: retrograde vs direct wording", () => {
 });
 
 describe("explainVerdict: endorse vs skeptical wording", () => {
-  it("endorses at high favor", () => {
-    const outcome = makeVerdictOutcome({ favor: 0.9 });
-    const message = explainVerdict(outcome, "bowling");
-    expect(message).toContain("The cosmos endorses this (p = 0.90).");
-    expect(message).not.toContain("👎");
-  });
-
-  it("is skeptical at low favor", () => {
-    const outcome = makeVerdictOutcome({ favor: 0.1 });
-    const message = explainVerdict(outcome, "bowling");
-    expect(message).toContain("The cosmos is skeptical of this (p = 0.10).");
-  });
-
-  // Firmness/thumb-direction wording no longer appears in this sentence at
-  // all (moved to src/experience/copy.ts, which reuses firmnessFor directly
-  // and has its own quadrant tests) -- this just confirms the endorse
-  // wording and p= formatting still hold near the midpoint, not "Tentatively".
-  it("still endorses, with correct p= formatting, near the midpoint", () => {
-    const outcome = makeVerdictOutcome({ favor: 0.55 });
-    const message = explainVerdict(outcome, "bowling");
-    expect(message).toContain("The cosmos endorses this (p = 0.55).");
+  it("endorses at/above 0.5 and is skeptical below it, with p= formatting, and never leaks firmness/emoji wording", () => {
+    // Firmness/thumb-direction wording no longer appears in this sentence at
+    // all (moved to src/experience/copy.ts, which reuses firmnessFor
+    // directly and has its own quadrant tests).
+    expect(explainVerdict(makeVerdictOutcome({ favor: 0.9 }), "bowling")).toBe(
+      "Bowling is ruled by Mars. Mars is direct in Aries. The cosmos endorses this (p = 0.90).",
+    );
+    expect(explainVerdict(makeVerdictOutcome({ favor: 0.1 }), "bowling")).toContain(
+      "The cosmos is skeptical of this (p = 0.10).",
+    );
+    expect(explainVerdict(makeVerdictOutcome({ favor: 0.55 }), "bowling")).toContain(
+      "The cosmos endorses this (p = 0.55).",
+    );
   });
 });
 
 describe("explainAmbiguity", () => {
-  it("returns no messages for a fully unambiguous, time-known chart", () => {
+  it("returns no messages for a fully unambiguous, time-known chart, nor for a merely not-computed Ascendant (no time/location given, expected)", () => {
     const natal = makeNatalChart({
       timeKnown: true,
       ascendant: { status: "ok", position: { longitude: 10, sign: "Aries", degreeInSign: 10 } },
     });
     expect(explainAmbiguity(natal)).toEqual([]);
+    expect(explainAmbiguity(makeNatalChart({ ascendant: { status: "not-computed" } }))).toEqual([]);
   });
 
   it("flags the exact cusp wording when the natal Sun is ambiguous", () => {
@@ -226,11 +206,6 @@ describe("explainAmbiguity", () => {
     });
     const messages = explainAmbiguity(natal);
     expect(messages.some((message) => message.includes("too close to the poles"))).toBe(true);
-  });
-
-  it("does not flag a merely not-computed Ascendant (no time/location given, expected)", () => {
-    const natal = makeNatalChart({ ascendant: { status: "not-computed" } });
-    expect(explainAmbiguity(natal)).toEqual([]);
   });
 });
 

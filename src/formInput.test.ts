@@ -15,13 +15,9 @@ describe("parseBirthDate", () => {
 });
 
 describe("formatBirthDateInput", () => {
-  it("is the inverse of parseBirthDate, zero-padded", () => {
+  it("is the inverse of parseBirthDate, zero-padded, and round-trips", () => {
     expect(formatBirthDateInput({ year: 1990, month: 7, day: 4 })).toBe("1990-07-04");
-  });
-
-  it("round-trips through parseBirthDate", () => {
-    const original = "1990-07-04";
-    expect(formatBirthDateInput(parseBirthDate(original))).toBe(original);
+    expect(formatBirthDateInput(parseBirthDate("1990-07-04"))).toBe("1990-07-04");
   });
 });
 
@@ -37,15 +33,9 @@ describe("parseBirthTime", () => {
 });
 
 describe("formatBirthTimeInput", () => {
-  it("is the inverse of parseBirthTime, zero-padded", () => {
+  it("is the inverse of parseBirthTime, zero-padded, and round-trips", () => {
     expect(formatBirthTimeInput({ hour: 9, minute: 5 })).toBe("09:05");
-  });
-
-  it("round-trips through parseBirthTime", () => {
-    const original = "09:05";
-    const parsed = parseBirthTime(original);
-    expect(parsed).toBeDefined();
-    expect(formatBirthTimeInput(parsed!)).toBe(original);
+    expect(formatBirthTimeInput(parseBirthTime("09:05")!)).toBe("09:05");
   });
 });
 
