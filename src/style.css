@@ -317,6 +317,18 @@ button[type="submit"]:hover {
   text-align: center;
 }
 
+.about-link {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+}
+
+.about-link:hover,
+.about-link:focus-visible {
+  color: #fff;
+}
+
 /*
  * Full-viewport experience overlay: the star-field/sign-resolve beat and the
  * final reveal both live here, shown at the same time rather than in

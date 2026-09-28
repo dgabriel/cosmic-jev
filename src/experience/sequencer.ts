@@ -56,6 +56,7 @@ async function runIntakeUntilOutcome(stage: HTMLElement): Promise<ResolvedIntake
       <h1 class="intake-title">Cosmic JEV</h1>
       <div id="intake-notice"></div>
       <div id="intake-form-host"></div>
+      <a class="about-link" href="https://github.com/dgabriel/cosmic-jev#readme" target="_blank" rel="noopener noreferrer">About this project</a>
     </div>
   `;
   const page = requireElementOfType("intake-page", HTMLDivElement);
