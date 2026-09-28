@@ -133,3 +133,22 @@ retrograde status, relevant aspect list, Moon phase, the activity text)
 Jev is reached through OpenRouter, not TypeSafe's own endpoint. See
 `docs/jev-openrouter.md` for the verified request/response shapes. The Worker
 secret is the OpenRouter API key.
+
+## Amendment: art-project overhaul supersedes this doc's UI section
+
+Section 3's UI (plain form + deadpan 👍/👎 card) is superseded by the
+"Cosmic JEV does Haruspicy" bar-napkin spec (see the plan at
+`/Users/dgabriel/.claude/plans/we-now-have-an-vectorized-pearl.md`): a
+multi-beat deep-fried experience (splash, star-field/constellation reveal,
+haruspicy flicker, emoji-thumb verdict) replacing the plain result card. In
+particular, `explainVerdict`'s sentence (section 3's example) no longer ends
+in `"Firmly 👍."` -- that trailing clause was dropped once the new
+headline/thumb copy (`src/experience/copy.ts`) took over signaling
+firmness/direction, to avoid saying the same thing twice.
+
+The sign-resolve beat shows the natal Sun's real constellation shape (star
+field particles rearranged into it, `src/experience/constellations.ts`), not
+the SVG zodiac wheel this section originally called for -- `zodiacWheel.ts`
+still exists in the repo but is unused. A stop-sign "consent gate" screen
+briefly ran between the splash and the form; it was cut entirely per the
+project owner ("kill the stop sign").

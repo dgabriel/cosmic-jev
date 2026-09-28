@@ -20,6 +20,7 @@ export default defineConfig(({ command }) => ({
       input: {
         main: here("./index.html"),
         admin: here("./admin.html"),
+        artist: here("./artist-statement.html"),
       },
     },
   },

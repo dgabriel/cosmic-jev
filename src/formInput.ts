@@ -20,6 +20,20 @@ export function parseBirthTime(value: string): BirthTime | undefined {
   return { hour: Number(hourStr), minute: Number(minuteStr) };
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+/** Inverse of `parseBirthDate`: a `BirthDate` back into an `<input type="date">` value ("YYYY-MM-DD"), for pre-filling a remembered value. */
+export function formatBirthDateInput(date: BirthDate): string {
+  return `${String(date.year).padStart(4, "0")}-${pad2(date.month)}-${pad2(date.day)}`;
+}
+
+/** Inverse of `parseBirthTime`: a `BirthTime` back into an `<input type="time">` value ("HH:MM"), for pre-filling a remembered value. */
+export function formatBirthTimeInput(time: BirthTime): string {
+  return `${pad2(time.hour)}:${pad2(time.minute)}`;
+}
+
 /**
  * Parses the latitude/longitude fields into a `BirthLocation`. Both must be
  * given together (or both left blank) since `BirthLocation` has no partial

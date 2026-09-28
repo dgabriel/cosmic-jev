@@ -9,12 +9,16 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "release-gate": "node scripts/release-gate.mjs"
+    "release-gate": "node scripts/release-gate.mjs",
+    "build:extension": "node extension/build.mjs"
   },
   "dependencies": {
-    "astronomy-engine": "^2.1.19"
+    "astronomy-engine": "^2.1.19",
+    "d3": "^7.9.0"
   },
   "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.2",

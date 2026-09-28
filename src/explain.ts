@@ -13,8 +13,14 @@ import type { Aspect } from "./aspects";
 import type { NatalChart } from "./natal";
 import type { OracleOutcome } from "./oracle";
 
-/** Exact wording from docs/spec.md section 2's routing description. */
-export const RECUSAL_MESSAGE = "The stars recuse themselves from this one.";
+/**
+ * Own wording (per the art-project "Cosmic spec" bar-napkin doc, not
+ * docs/spec.md): still deliberately generic about *why* the outcome
+ * recursed, the same property the earlier wording had -- `OracleOutcome`'s
+ * recusal variant carries no `SensitivityCategory`, so the UI has never known
+ * (and still doesn't) whether it was violence_person, safety, or legal.
+ */
+export const RECUSAL_MESSAGE = "The stars recommend therapy for this one.";
 
 /**
  * Shown alongside the explanation whenever `OracleOutcome`'s `disclaimer`
@@ -109,7 +115,7 @@ function describeAspects(aspects: readonly Aspect[]): string {
  * Renders the full deadpan verdict sentence, following docs/spec.md section
  * 3's example shape: "{Activity} is ruled by {body}. {Body} is
  * {direct/retrograde} in {sign}[, {aspect list}]. The cosmos
- * {endorses/is skeptical of} this (p = {favor}). {Firmly/Tentatively} {emoji}."
+ * {endorses/is skeptical of} this (p = {favor})."
  */
 export function explainVerdict(
   outcome: Extract<OracleOutcome, { kind: "verdict" }>,
@@ -122,14 +128,11 @@ export function explainVerdict(
     ? `${category} is ${motion} in ${rulingBodyTransit.sign}, ${aspectSummary}.`
     : `${category} is ${motion} in ${rulingBodyTransit.sign}.`;
   const verdictWord = favor >= 0.5 ? "endorses" : "is skeptical of";
-  const firmness = firmnessFor(favor);
-  const emoji = emojiFor(favor);
 
   return [
     `${capitalize(activityText)} is ruled by ${category}.`,
     positionSentence,
     `The cosmos ${verdictWord} this (p = ${favor.toFixed(2)}).`,
-    `${firmness} ${emoji}.`,
   ].join(" ");
 }
 

@@ -71,6 +71,8 @@ form {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  width: 100%;
+  max-width: 26rem;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
@@ -215,6 +217,19 @@ button[type="submit"]:hover {
   border-radius: 0.35rem;
 }
 
+/* Artist statement (artist-statement.html) */
+
+.artist-statement {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+}
+
+.artist-statement a {
+  color: var(--color-accent);
+}
+
 /* Spend ledger (admin.html) */
 
 .ledger-summary {
@@ -248,4 +263,175 @@ button[type="submit"]:hover {
 .ledger-table td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Acid-green accent, used by the Again link's focus ring below. The
+ * haruspicy placeholder-card beat this color used to also drive (a loading
+ * bar, then card-flicker CSS) was cut entirely per owner feedback -- it read
+ * as broken, and the reveal now shows the real result immediately instead of
+ * waiting behind it.
+ */
+:root {
+  --color-acid-green: #baff00;
+}
+
+/*
+ * Intake page: the brownie photo as a full-bleed background behind the
+ * "Cosmic JEV" title and the form. There is no separate cover/splash screen
+ * anymore -- both it and the stop-sign consent gate that used to follow it
+ * were cut entirely, per the project owner ("no cover page, brownie as
+ * background for the form, Cosmic JEV is the title on the form page").
+ * `position: fixed` breaks this out of any ancestor's max-width/centering
+ * the same way `.experience-overlay` does later, and `overflow-y: auto`
+ * lets the page itself scroll (e.g. the optional birth-details expanding, or
+ * a long error message) without the fixed background ever moving. Exempt
+ * from prefers-color-scheme for the same reason the overlay is: the photo
+ * dominates the screen, not app chrome -- the form panel itself stays
+ * opaque (`--color-panel`) so its fields are legible regardless.
+ */
+
+.intake-page {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem 1rem;
+  background-color: #05050a;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.intake-title {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.85);
+  text-align: center;
+}
+
+/*
+ * Full-viewport experience overlay: the star-field/sign-resolve beat and the
+ * final reveal both live here, shown at the same time rather than in
+ * sequence, appended to <body> so `position: fixed` can't be broken by any
+ * ancestor transform/overflow on `.app`. Always dark regardless of theme --
+ * see this file's header comment for why this one sequence is the
+ * deliberate exception to the app's light/dark-aware rule.
+ */
+.experience-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  overflow-y: auto;
+  padding: 2rem 1rem;
+  text-align: center;
+  background: #05050a;
+  color: #f5f7ff;
+  font-family: var(--font-body);
+}
+
+.verdict-resolve-beat,
+.recusal-beat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+/* 50% so the still-resolving constellation behind it (signResolve.ts's
+   starfield, shown at the same time as this, not before it) shows through
+   the result. The Again link below is a sibling of this, at full opacity --
+   it's a control, not part of "the result". */
+.verdict-resolve-result,
+.recusal-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  opacity: 0.5;
+}
+
+.verdict-resolve-glyph,
+.recusal-glyph {
+  width: 6rem;
+  height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.beat-glyph {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+/* No standalone "sideways thumb" emoji exists -- a thumbs-up rotated 90°
+   reads as the same gesture turned sideways (see glyphs.ts). */
+.beat-glyph--sideways {
+  display: inline-block;
+  transform: rotate(90deg);
+}
+
+.verdict-resolve-headline {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.verdict-resolve-justification,
+.recusal-message {
+  margin: 0;
+}
+
+/* Fixed dark-mode disclaimer colors (not the theme-dependent --color-* pair):
+   this card only ever appears inside the always-dark overlay. */
+.experience-overlay .verdict-disclaimer {
+  text-align: left;
+  background: #332a0d;
+  color: #f0d878;
+}
+
+/* Same fix for the ambiguity captions signResolve.ts renders inside the
+   overlay: #ambiguity-notes ul's global rule uses --color-muted, which in
+   light mode is a dark gray meant for a light background -- unreadable on
+   this always-dark overlay. */
+.experience-overlay #ambiguity-notes ul {
+  color: #b7b3c2;
+}
+
+/* Plain link-styled control (per the project owner: "change the again
+   button to be a link, no brownie sprinkles" -- replaced an earlier
+   literal-sprinkle-lettering button). */
+.again-link {
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-acid-green);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.again-link:hover {
+  filter: brightness(1.15);
+}
+
+.again-link:focus-visible {
+  outline: 2px solid var(--color-acid-green);
+  outline-offset: 2px;
 }

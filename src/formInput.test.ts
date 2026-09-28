@@ -1,9 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { parseBirthDate, parseBirthTime, parseLocation, parseUtcOffsetMinutes } from "./formInput";
+import {
+  formatBirthDateInput,
+  formatBirthTimeInput,
+  parseBirthDate,
+  parseBirthTime,
+  parseLocation,
+  parseUtcOffsetMinutes,
+} from "./formInput";
 
 describe("parseBirthDate", () => {
   it("parses a YYYY-MM-DD date input value", () => {
     expect(parseBirthDate("1990-07-04")).toEqual({ year: 1990, month: 7, day: 4 });
+  });
+});
+
+describe("formatBirthDateInput", () => {
+  it("is the inverse of parseBirthDate, zero-padded", () => {
+    expect(formatBirthDateInput({ year: 1990, month: 7, day: 4 })).toBe("1990-07-04");
+  });
+
+  it("round-trips through parseBirthDate", () => {
+    const original = "1990-07-04";
+    expect(formatBirthDateInput(parseBirthDate(original))).toBe(original);
   });
 });
 
@@ -15,6 +33,19 @@ describe("parseBirthTime", () => {
 
   it("parses an HH:MM time input value", () => {
     expect(parseBirthTime("09:05")).toEqual({ hour: 9, minute: 5 });
+  });
+});
+
+describe("formatBirthTimeInput", () => {
+  it("is the inverse of parseBirthTime, zero-padded", () => {
+    expect(formatBirthTimeInput({ hour: 9, minute: 5 })).toBe("09:05");
+  });
+
+  it("round-trips through parseBirthTime", () => {
+    const original = "09:05";
+    const parsed = parseBirthTime(original);
+    expect(parsed).toBeDefined();
+    expect(formatBirthTimeInput(parsed!)).toBe(original);
   });
 });
 

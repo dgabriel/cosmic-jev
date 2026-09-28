@@ -91,7 +91,7 @@ describe("explainOutcome: recusal and needs-detail", () => {
   it("renders the exact recusal wording and nothing numeric", () => {
     const message = explainOutcome({ kind: "recusal" }, "quit my job");
     expect(message).toBe(RECUSAL_MESSAGE);
-    expect(message).toBe("The stars recuse themselves from this one.");
+    expect(message).toBe("The stars recommend therapy for this one.");
     expect(message).not.toMatch(/\d/);
   });
 
@@ -110,7 +110,7 @@ describe("explainVerdict: the spec's own worked example", () => {
     const message = explainVerdict(outcome, "Bowling");
     expect(message).toBe(
       "Bowling is ruled by Mars. Mars is direct in Aries, trine your natal Sun. " +
-        "The cosmos endorses this (p = 0.81). Firmly 👍.",
+        "The cosmos endorses this (p = 0.81).",
     );
   });
 });
@@ -161,26 +161,28 @@ describe("explainVerdict: retrograde vs direct wording", () => {
   });
 });
 
-describe("explainVerdict: endorse vs skeptical wording, firmly vs tentatively", () => {
-  it("endorses and is Firmly at high favor", () => {
+describe("explainVerdict: endorse vs skeptical wording", () => {
+  it("endorses at high favor", () => {
     const outcome = makeVerdictOutcome({ favor: 0.9 });
     const message = explainVerdict(outcome, "bowling");
     expect(message).toContain("The cosmos endorses this (p = 0.90).");
     expect(message).not.toContain("👎");
-    expect(message).toContain("Firmly 👍.");
   });
 
-  it("is skeptical and Firmly at low favor", () => {
+  it("is skeptical at low favor", () => {
     const outcome = makeVerdictOutcome({ favor: 0.1 });
     const message = explainVerdict(outcome, "bowling");
     expect(message).toContain("The cosmos is skeptical of this (p = 0.10).");
-    expect(message).toContain("Firmly 👎.");
   });
 
-  it("is Tentatively near the midpoint", () => {
+  // Firmness/thumb-direction wording no longer appears in this sentence at
+  // all (moved to src/experience/copy.ts, which reuses firmnessFor directly
+  // and has its own quadrant tests) -- this just confirms the endorse
+  // wording and p= formatting still hold near the midpoint, not "Tentatively".
+  it("still endorses, with correct p= formatting, near the midpoint", () => {
     const outcome = makeVerdictOutcome({ favor: 0.55 });
     const message = explainVerdict(outcome, "bowling");
-    expect(message).toContain("Tentatively 👍.");
+    expect(message).toContain("The cosmos endorses this (p = 0.55).");
   });
 });
 
