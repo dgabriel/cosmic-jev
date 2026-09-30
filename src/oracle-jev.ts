@@ -267,7 +267,10 @@ const CATEGORY_INSTRUCTIONS = "Which celestial body rules this activity?";
 const SENSITIVITY_CRITERIA: Record<SensitivityCategory, string> = {
   violence_person:
     "Violence, harm, or aggression directed at a person or animal -- including the asker harming themselves " +
-    "(self-harm, suicide, or wanting to end their own life). Always pick this over health/safety/legal if it applies.",
+    "(self-harm, suicide, or wanting to end their own life), and eating an animal that isn't ordinary food: a pet or " +
+    "companion animal (cat, dog, rabbit, hamster, horse), a protected or endangered animal (dolphin, whale, panda, ape), " +
+    "or a person. Eating ordinary food animals (chicken, fish, beef, pork, lamb, seafood) is NOT harm. " +
+    "Always pick this over health/safety/legal if it applies.",
   safety: "A decision about physical safety or risk of injury, not otherwise about violence toward a person, animal, or object.",
   legal: "A decision with legal consequences: lawsuits, contracts with legal weight, breaking the law, legal advice.",
   health: "A decision about physical or mental health, medication, medical treatment, surgery, or diagnosis -- not self-harm.",
@@ -277,7 +280,9 @@ const SENSITIVITY_CRITERIA: Record<SensitivityCategory, string> = {
   violence_object:
     "Violence, force, or destruction directed only at an inanimate object or thing (e.g. smashing a printer) -- " +
     "never at a person or animal, and not self-harm.",
-  none: "None of the above: an ordinary activity with no special real-life-consequence or safety concern.",
+  none:
+    "None of the above: an ordinary activity with no special real-life-consequence or safety concern, " +
+    "including eating ordinary food such as chicken, fish, beef, pork, or lamb.",
 };
 
 /**

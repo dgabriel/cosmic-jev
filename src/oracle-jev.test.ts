@@ -139,6 +139,9 @@ describe("JevOracle.classify (Call 1)", () => {
     });
     const sensitivityCriteria = questions["sensitivity"]?.["criteria"] as Record<string, string>;
     expect(sensitivityCriteria["violence_person"]).toMatch(/self-harm|suicide/i);
+    // Eating a pet is harm; eating ordinary food animals is not (project owner's call).
+    expect(sensitivityCriteria["violence_person"]).toMatch(/pet/i);
+    expect(sensitivityCriteria["none"]).toMatch(/chicken/i);
     expect(questions["vague"]).toEqual({
       type: "noul",
       instructions: "Is this activity description too vague to categorize?",

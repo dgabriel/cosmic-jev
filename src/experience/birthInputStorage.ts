@@ -34,3 +34,28 @@ export function saveBirthInput(birthInput: BirthInput): void {
     // See the module comment: persistence failing here is not fatal.
   }
 }
+
+const CITY_STORAGE_KEY = "cosmicJevBirthCity";
+
+/**
+ * The birth-city field's text, kept separately from `BirthInput` (which only
+ * holds the resolved coordinates/offset) so a returning visitor sees the city
+ * they picked rather than raw numbers in the advanced fields. Same
+ * fail-silently rules as above.
+ */
+export function loadBirthCity(): string | undefined {
+  try {
+    return localStorage.getItem(CITY_STORAGE_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveBirthCity(city: string): void {
+  try {
+    if (city === "") localStorage.removeItem(CITY_STORAGE_KEY);
+    else localStorage.setItem(CITY_STORAGE_KEY, city);
+  } catch {
+    // See the module comment: persistence failing here is not fatal.
+  }
+}

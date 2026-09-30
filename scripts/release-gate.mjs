@@ -10,13 +10,10 @@
  *
  * expected_answer vocabulary: a ruling-body name (`Mars`, `Venus`, ...) for
  * an exact category match on an ordinary verdict; `recusal` and `vague` for
- * those two non-verdict outcomes; `disclaimer` for a verdict carrying the
- * oracle-2au health/money/relationship_ending/job_quitting disclaimer flag
- * (any category -- per spec those questions proceed to a real verdict, and
- * the disclaimer flag, not the ruling body, is the point of the row);
- * `verdict` for a disclaimer=false verdict at any category (used for the
- * violence-toward-an-object row: per oracle-2au that classifies normally,
- * with no special handling to pin a specific category for).
+ * those two non-verdict outcomes; `verdict` for a verdict at any category
+ * (used where the point of the row is "this gets answered, not recused" --
+ * health/money/relationship/job questions and violence toward an object --
+ * rather than which ruling body it lands on).
  *
  * Loads src/oracle.ts and src/releaseGate/csv.ts (both TypeScript) directly
  * via Vite's programmatic SSR module loader (server.ssrLoadModule), so this
@@ -56,13 +53,12 @@ async function loadModules() {
 function actualAnswerFor(routing) {
   if (routing.kind === "recusal") return "recusal";
   if (routing.kind === "needs-detail") return "vague";
-  if (routing.disclaimer) return "disclaimer";
   return routing.category;
 }
 
 function matchesExpected(expectedAnswer, routing, actualAnswer) {
   if (expectedAnswer === "verdict") {
-    return routing.kind === "proceed" && !routing.disclaimer;
+    return routing.kind === "proceed";
   }
   return actualAnswer === expectedAnswer;
 }

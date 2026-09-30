@@ -15,8 +15,6 @@
   --color-error-bg: #fdecea;
   --color-error-fg: #7a1f14;
   --color-pending-fg: #5b5b5b;
-  --color-disclaimer-bg: #fdf6e3;
-  --color-disclaimer-fg: #6b5300;
   --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -31,9 +29,7 @@
     --color-error-bg: #3a1613;
     --color-error-fg: #ffb4a8;
     --color-pending-fg: #b7b3c2;
-    --color-disclaimer-bg: #332a0d;
-    --color-disclaimer-fg: #f0d878;
-  }
+      }
 }
 
 * {
@@ -206,17 +202,6 @@ button[type="submit"]:hover {
   text-align: left;
 }
 
-.verdict-disclaimer {
-  margin: 0.75rem 0 0;
-  padding: 0.6rem 0.85rem;
-  text-align: left;
-  font-size: 0.9rem;
-  font-style: italic;
-  color: var(--color-disclaimer-fg);
-  background: var(--color-disclaimer-bg);
-  border-radius: 0.35rem;
-}
-
 /* Artist statement (artist-statement.html) */
 
 .artist-statement {
@@ -277,21 +262,31 @@ button[type="submit"]:hover {
 }
 
 /*
- * Intake page: the brownie photo as a full-bleed background behind the
- * "Cosmic JEV" title and the form. There is no separate cover/splash screen
- * anymore -- both it and the stop-sign consent gate that used to follow it
- * were cut entirely, per the project owner ("no cover page, brownie as
- * background for the form, Cosmic JEV is the title on the form page").
- * `position: fixed` breaks this out of any ancestor's max-width/centering
- * the same way `.experience-overlay` does later, and `overflow-y: auto`
- * lets the page itself scroll (e.g. the optional birth-details expanding, or
- * a long error message) without the fixed background ever moving. Exempt
- * from prefers-color-scheme for the same reason the overlay is: the photo
- * dominates the screen, not app chrome -- the form panel itself stays
- * opaque (`--color-panel`) so its fields are legible regardless.
+ * Intake page, per the owner's landing-page sketch (oracle-rq3): a black
+ * starfield (the same canvas starfield.ts draws for the reveal, mounted in
+ * the fixed `.intake-sky` layer) fills the page, the brownie photo sits
+ * behind the sparkly "Cosmic JEV" title only, and the form floats below on a
+ * translucent dark panel; the result later replaces the form in place.
+ * There is no separate cover/splash screen -- both it and the stop-sign
+ * consent gate were cut per the project owner. `position: fixed` breaks
+ * this out of any ancestor's max-width/centering, and `overflow-y: auto`
+ * lets the page scroll (e.g. Advanced expanding, or a long error message)
+ * while the sky layer stays put. Always dark regardless of
+ * prefers-color-scheme: the dark tokens are re-declared here so the form's
+ * fields, messages and the result match the night sky.
  */
 
 .intake-page {
+  --color-bg: #0d0c14;
+  --color-fg: #eeeeec;
+  --color-muted: #b7b3c2;
+  --color-border: #3d3a52;
+  --color-accent: #b6a6ff;
+  --color-panel: rgba(20, 18, 32, 0.78);
+  --color-error-bg: #3a1613;
+  --color-error-fg: #ffb4a8;
+  --color-pending-fg: #b7b3c2;
+  color-scheme: dark;
   position: fixed;
   inset: 0;
   z-index: 9998;
@@ -300,21 +295,169 @@ button[type="submit"]:hover {
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  padding: 2rem 1rem;
-  background-color: #05050a;
+  padding: 2.5rem 1rem 2rem;
+  background: #000;
+  color: var(--color-fg);
+}
+
+.intake-sky {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Everything but the sky paints above it. */
+.intake-page > :not(.intake-sky) {
+  position: relative;
+}
+
+.intake-title-box {
+  width: 100%;
+  max-width: 26rem;
+  padding: 1.5rem 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background-color: #2a1a10;
   background-size: cover;
   background-position: center;
-  background-repeat: no-repeat;
+  box-shadow: 0 0 40px rgba(182, 166, 255, 0.18);
 }
 
 .intake-title {
   margin: 0;
-  font-size: 2.5rem;
+  line-height: 0;
+}
+
+/* The title set along an SVG arc (textPath), so it arches and scales with the box. */
+.intake-title-arch {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9));
+}
+
+.intake-title-arch text {
+  fill: #fff;
+  /* A chocolate outline painted under each letter keeps the colors legible on the brownie. */
+  stroke: #2a1a10;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  font-family: var(--font-body);
+  font-size: 58px;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #fff;
-  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.85);
-  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* One color per letter, sampled from the brownie photo's sprinkles and brightened a touch. */
+.sprinkle-red {
+  fill: #ef5a57;
+}
+.sprinkle-orange {
+  fill: #f59331;
+}
+.sprinkle-yellow {
+  fill: #f7c90a;
+}
+.sprinkle-lime {
+  fill: #b9dc4c;
+}
+.sprinkle-blue {
+  fill: #7cc8ee;
+}
+.sprinkle-periwinkle {
+  fill: #9aa5ea;
+}
+.sprinkle-pink {
+  fill: #f39fc3;
+}
+
+/* The sketch's sparkles scattered around the title. */
+.intake-title-box::before,
+.intake-title-box::after {
+  position: absolute;
+  color: #fff8e7;
+  text-shadow: 0 0 8px rgba(255, 248, 231, 0.9);
+  pointer-events: none;
+  animation: intake-sparkle 2.4s ease-in-out infinite;
+}
+
+.intake-title-box::before {
+  content: "\2726  \00B7";
+  top: 0.6rem;
+  left: 1rem;
+  font-size: 1.1rem;
+}
+
+.intake-title-box::after {
+  content: "\00B7  \2727  \2726";
+  bottom: 0.6rem;
+  right: 1rem;
+  font-size: 0.95rem;
+  white-space: pre;
+  animation-delay: 1.2s;
+}
+
+@keyframes intake-sparkle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intake-title-box::before,
+  .intake-title-box::after {
+    animation: none;
+  }
+}
+
+#intake-form-host {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.intake-form {
+  max-width: none;
+  backdrop-filter: blur(3px);
+}
+
+.intake-form .optional {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.ask-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ask-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ask-row button[type="submit"] {
+  align-self: stretch;
+  white-space: nowrap;
+  color: #14131a;
+}
+
+#intake-message:empty {
+  display: none;
+}
+
+.intake-credit {
+  margin: -1rem 0 0;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.intake-credit a {
+  color: inherit;
 }
 
 .about-link {
@@ -330,28 +473,31 @@ button[type="submit"]:hover {
 }
 
 /*
- * Full-viewport experience overlay: the star-field/sign-resolve beat and the
- * final reveal both live here, shown at the same time rather than in
- * sequence, appended to <body> so `position: fixed` can't be broken by any
- * ancestor transform/overflow on `.app`. Always dark regardless of theme --
- * see this file's header comment for why this one sequence is the
- * deliberate exception to the app's light/dark-aware rule.
+ * The result, shown in place of the intake form on the same page. No panel
+ * background, so the constellation the starfield swirls into behind it stays
+ * visible; the text shadow keeps it legible over the stars.
  */
-.experience-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
+.intake-result {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-  overflow-y: auto;
-  padding: 2rem 1rem;
+  gap: 1.25rem;
+  padding: 0.5rem 0 1rem;
   text-align: center;
-  background: #05050a;
   color: #f5f7ff;
-  font-family: var(--font-body);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.95);
+}
+
+.sign-resolve-label {
+  text-align: center;
+}
+
+.sign-resolve-sign-name {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff8e7;
 }
 
 .verdict-resolve-beat,
@@ -363,17 +509,12 @@ button[type="submit"]:hover {
   max-width: 32rem;
 }
 
-/* 50% so the still-resolving constellation behind it (signResolve.ts's
-   starfield, shown at the same time as this, not before it) shows through
-   the result. The Again link below is a sibling of this, at full opacity --
-   it's a control, not part of "the result". */
 .verdict-resolve-result,
 .recusal-result {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  opacity: 0.5;
 }
 
 .verdict-resolve-glyph,
@@ -405,22 +546,6 @@ button[type="submit"]:hover {
 .verdict-resolve-justification,
 .recusal-message {
   margin: 0;
-}
-
-/* Fixed dark-mode disclaimer colors (not the theme-dependent --color-* pair):
-   this card only ever appears inside the always-dark overlay. */
-.experience-overlay .verdict-disclaimer {
-  text-align: left;
-  background: #332a0d;
-  color: #f0d878;
-}
-
-/* Same fix for the ambiguity captions signResolve.ts renders inside the
-   overlay: #ambiguity-notes ul's global rule uses --color-muted, which in
-   light mode is a dark gray meant for a light background -- unreadable on
-   this always-dark overlay. */
-.experience-overlay #ambiguity-notes ul {
-  color: #b7b3c2;
 }
 
 /* Plain link-styled control (per the project owner: "change the again

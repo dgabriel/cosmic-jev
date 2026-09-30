@@ -61,8 +61,15 @@ describe("route", () => {
   }
 
   const RECUSING_SENSITIVITIES: readonly SensitivityCategory[] = ["violence_person", "safety", "legal"];
-  const DISCLAIMER_SENSITIVITIES: readonly SensitivityCategory[] = ["health", "money", "relationship_ending", "job_quitting"];
-  const NO_DISCLAIMER_SENSITIVITIES: readonly SensitivityCategory[] = ["violence_object", "none"];
+  // No middle tier (oracle-ral): every non-recusing bucket proceeds identically.
+  const PROCEEDING_SENSITIVITIES: readonly SensitivityCategory[] = [
+    "health",
+    "money",
+    "relationship_ending",
+    "job_quitting",
+    "violence_object",
+    "none",
+  ];
 
   it.each(RECUSING_SENSITIVITIES)("recuses for sensitivity=%s regardless of vague, with reason=%s", (sensitivity) => {
     expect(route(classification(sensitivity, 0))).toEqual({ kind: "recusal", reason: sensitivity });
@@ -73,13 +80,10 @@ describe("route", () => {
     expect(route(classification("violence_person", VAGUE_THRESHOLD)).kind).toBe("recusal");
   });
 
-  it.each(DISCLAIMER_SENSITIVITIES)("proceeds with disclaimer=true for sensitivity=%s", (sensitivity) => {
-    expect(route(classification(sensitivity, 0))).toEqual({ kind: "proceed", category: "Mars", disclaimer: true });
+  it.each(PROCEEDING_SENSITIVITIES)("proceeds to a plain verdict for sensitivity=%s", (sensitivity) => {
+    expect(route(classification(sensitivity, 0))).toEqual({ kind: "proceed", category: "Mars" });
   });
 
-  it.each(NO_DISCLAIMER_SENSITIVITIES)("proceeds with disclaimer=false for sensitivity=%s", (sensitivity) => {
-    expect(route(classification(sensitivity, 0))).toEqual({ kind: "proceed", category: "Mars", disclaimer: false });
-  });
 
   it("asks for detail just below, at, and just above the vague threshold (non-recusing sensitivity)", () => {
     expect(route(classification("none", VAGUE_THRESHOLD - 0.01)).kind).toBe("proceed");
@@ -191,7 +195,7 @@ describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () 
     }
   });
 
-  it("proceeds to a verdict for an ordinary, non-vague, non-sensitive activity, with disclaimer=false", async () => {
+  it("proceeds to a verdict for an ordinary, non-vague, non-sensitive activity", async () => {
     const context: OracleContext = {
       transits: makeTransitChart(),
       natal: makeNatalChart(),
@@ -203,11 +207,10 @@ describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () 
       expect(outcome.category).toBe("Mars");
       expect(outcome.favor).toBeGreaterThanOrEqual(0);
       expect(outcome.favor).toBeLessThanOrEqual(1);
-      expect(outcome.disclaimer).toBe(false);
     }
   });
 
-  it("proceeds to a verdict with disclaimer=true for a health/money/relationship/job-quitting activity (oracle-2au: these no longer recuse)", async () => {
+  it("proceeds to a verdict for a health/money/relationship/job-quitting activity (no recusal, no disclaimer tier)", async () => {
     const context: OracleContext = {
       transits: makeTransitChart(),
       natal: makeNatalChart(),
@@ -215,9 +218,6 @@ describe("StubOracle recusal/needs-detail outcomes carry no verdict fields", () 
     };
     const outcome = await askOracle(new StubOracle(), context);
     expect(outcome.kind).toBe("verdict");
-    if (outcome.kind === "verdict") {
-      expect(outcome.disclaimer).toBe(true);
-    }
   });
 });
 
@@ -244,7 +244,7 @@ describe("StubOracle does not misroute ordinary everyday phrasing to vague", () 
     expect(result.vague).toBeGreaterThanOrEqual(VAGUE_THRESHOLD);
   });
 
-  it('a sensitivity-only keyword match ("cardiologist"+"checkup" -> health) is not vague, and proceeds to a disclaimer verdict end to end', async () => {
+  it('a sensitivity-only keyword match ("cardiologist"+"checkup" -> health) is not vague, and proceeds to a verdict end to end', async () => {
     const result = await oracle.classify("Went to see my cardiologist for a checkup");
     expect(result.sensitivity).toBe("health");
     expect(result.vague).toBeLessThan(VAGUE_THRESHOLD);
@@ -254,9 +254,6 @@ describe("StubOracle does not misroute ordinary everyday phrasing to vague", () 
       activityText: "Went to see my cardiologist for a checkup",
     });
     expect(outcome.kind).toBe("verdict");
-    if (outcome.kind === "verdict") {
-      expect(outcome.disclaimer).toBe(true);
-    }
   });
 });
 
@@ -274,16 +271,49 @@ describe("StubOracle sensitivity buckets", () => {
     expect(result.sensitivity).toBe(expected);
   });
 
-  it("a disclaimer bucket (money) proceeds to a verdict end to end, never recuses", async () => {
+  it("a money question proceeds to a verdict end to end, never recuses", async () => {
     const outcome = await askOracle(oracle, {
       transits: makeTransitChart(),
       natal: makeNatalChart(),
       activityText: "Should I take out a mortgage on a new house",
     });
     expect(outcome.kind).toBe("verdict");
-    if (outcome.kind === "verdict") {
-      expect(outcome.disclaimer).toBe(true);
-    }
+  });
+});
+
+describe("StubOracle eating: food animals vs pets/protected animals/people", () => {
+  const oracle = new StubOracle();
+
+  it.each([
+    "should I eat a chicken",
+    "shoul I eat some fish",
+    "Should I eat lamb",
+    "Should I grill some pork chops tonight",
+    "Should I eat catfish",
+    "Should I eat a hot dog",
+    "Should I eat dinner with my dog",
+    "Should I eat baby carrots",
+    "Should I eat my friend's fries",
+    "Should I eat dog food on a dare",
+  ])("treats %j as ordinary food, not animal harm", async (text) => {
+    const classification = await oracle.classify(text);
+    expect(classification.sensitivity).not.toBe("violence_person");
+    expect(route(classification).kind).not.toBe("recusal");
+  });
+
+  it.each([
+    "should I eat a cat",
+    "Should I eat my dog",
+    "Should I cook my neighbor's puppy",
+    "Should I eat my pet chicken",
+    "Should I eat a rabbit",
+    "Should I eat a baby dolphin",
+    "Should I eat some horse",
+    "Should I eat a person",
+  ])("treats %j as animal/person harm and recuses", async (text) => {
+    const classification = await oracle.classify(text);
+    expect(classification.sensitivity).toBe("violence_person");
+    expect(route(classification).kind).toBe("recusal");
   });
 });
 
@@ -319,16 +349,13 @@ describe("StubOracle violence_person vs violence_object (verb + target heuristic
     expect(result.sensitivity).toBe("relationship_ending");
   });
 
-  it("violence_object proceeds to a verdict end to end: no recusal, disclaimer=false", async () => {
+  it("violence_object proceeds to a verdict end to end: no recusal", async () => {
     const outcome = await askOracle(oracle, {
       transits: makeTransitChart(),
       natal: makeNatalChart(),
       activityText: "Should I smash my printer with a baseball bat",
     });
     expect(outcome.kind).toBe("verdict");
-    if (outcome.kind === "verdict") {
-      expect(outcome.disclaimer).toBe(false);
-    }
   });
 
   it("self-harm phrasing recuses end to end", async () => {

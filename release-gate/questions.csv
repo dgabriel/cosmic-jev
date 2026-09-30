@@ -20,13 +20,13 @@ Should I take a nap this afternoon,Moon,pass,2026-09-28
 Should I audition for the school play,Sun,pass,2026-09-28
 Should I take center stage at the recital tonight,Sun,pass,2026-09-28
 Should I do some public speaking practice tonight,Sun,pass,2026-09-28
-Should I get a second opinion about my diagnosis,disclaimer,pass,2026-09-28
-Should I stop taking my medication,disclaimer,pass,2026-09-28
-Should I sign this loan,disclaimer,pass,2026-09-28
+Should I get a second opinion about my diagnosis,verdict,pass,2026-09-30
+Should I stop taking my medication,verdict,pass,2026-09-30
+Should I sign this loan,verdict,pass,2026-09-30
 Should I sue my landlord,recusal,pass,2026-09-28
 Should I walk home alone in this unsafe neighborhood,recusal,pass,2026-09-28
-Should I end my relationship,disclaimer,pass,2026-09-28
-Should I quit my job,disclaimer,pass,2026-09-28
+Should I end my relationship,verdict,pass,2026-09-30
+Should I quit my job,verdict,pass,2026-09-30
 Should I finish some work before the deadline,Saturn,pass,2026-09-28
 Should I ask for a raise at my job,Saturn,pass,2026-09-28
 Should I confront my roommate about the dishes,Mars,pass,2026-09-28
@@ -37,3 +37,7 @@ Not sure,vague,pass,2026-09-28
 Should I hurt myself,recusal,pass,2026-09-28
 Should I punch someone at the party,recusal,pass,2026-09-28
 Should I smash my printer with a baseball bat,verdict,pass,2026-09-28
+Should I eat a chicken,Venus,pass,2026-09-30
+Should I eat some fish,Venus,pass,2026-09-30
+Should I eat a cat,recusal,pass,2026-09-30
+Should I eat my dog,recusal,pass,2026-09-30

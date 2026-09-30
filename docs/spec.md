@@ -88,10 +88,12 @@ Routing, in this priority order:
 - vague p ≥ 0.75 → ask the user to be more specific (raised from the
   original 0.6: real Jev scored ordinary activities like "Should I have a
   party tonight" ~0.68-0.70, above 0.6, with no real ambiguity to clarify)
-- `health`, `money`, `relationship_ending`, `job_quitting` → Call 2, and
-  show the verdict together with a visible "this is not real advice"
-  disclaimer; keep the tone light
-- `violence_object`, `none` → Call 2, no special handling
+- everything else (`health`, `money`, `relationship_ending`,
+  `job_quitting`, `violence_object`, `none`) → Call 2, a plain verdict. No
+  middle tier: a question is either unacceptable (recusal) or OK. (Health,
+  money, relationship-ending and job-quitting verdicts used to carry a
+  disclaimer; removed per the project owner as unhelpful and distracting.
+  The buckets stay in the Choice so Jev has a correct home for them.)
 
 Whenever the bucket is ambiguous, bias toward recusal: false alarms are
 cheap and misses aren't funny.
@@ -106,9 +108,7 @@ retrograde status, relevant aspect list, Moon phase, the activity text)
 - Inputs: birthdate (required), birth time + location (optional, collapsed),
   activity (free text)
 - Result: a big 👍 or 👎, with "firmly" vs "tentatively" based on distance
-  from 0.5. Verdicts in the disclaimer buckets (health, money,
-  relationship-ending, job-quitting) additionally show the disclaimer as a
-  visibly separate element next to the explanation.
+  from 0.5.
 - Deadpan explanation templated from the typed results. No LLM-generated text.
   Example: "Bowling is ruled by Mars. Mars is direct in Aries, trine your natal
   Sun. The cosmos endorses this (p = 0.81). Firmly 👍."
@@ -127,8 +127,8 @@ retrograde status, relevant aspect list, Moon phase, the activity text)
 - No written horoscope text and no scraped horoscope content
 - No verdicts on violence toward a person or animal (including self-harm),
   safety, or legal questions, ever -- those always recuse (see routing
-  above). Health, money, relationship-ending, and job-quitting questions do
-  get verdicts, always with a visible disclaimer.
+  above). Everything else, including health, money, relationship-ending,
+  and job-quitting questions, gets a plain verdict.
 - No storing birthdates server-side
 
 ## Amendment: Jev is called via OpenRouter

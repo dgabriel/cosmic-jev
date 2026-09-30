@@ -23,21 +23,6 @@ import type { OracleOutcome } from "./oracle";
 export const RECUSAL_MESSAGE = "The stars recommend therapy for this one.";
 
 /**
- * Shown alongside the explanation whenever `OracleOutcome`'s `disclaimer`
- * flag is true (oracle-2au): health, money, relationship_ending, and
- * job_quitting all proceed to a real verdict, but the app still wants to be
- * visibly clear it isn't real advice. One generic line rather than four
- * per-bucket-flavored ones -- `OracleOutcome`'s verdict variant only carries
- * a `disclaimer: boolean`, not which `SensitivityCategory` triggered it (see
- * oracle.ts), so a single line that reads sensibly for all four is simpler
- * to write and maintain than plumbing the specific bucket all the way
- * through just for copy. Deadpan/light tone to match the rest of the app,
- * but unambiguous that this isn't real advice.
- */
-export const DISCLAIMER_MESSAGE =
-  "This one touches something that actually matters. The stars will still weigh in, but please also talk to an actual doctor, financial advisor, therapist, or other qualified human -- whichever applies -- before doing anything based on a planetary alignment.";
-
-/**
  * Own wording (spec leaves the exact phrasing to the UI, section 3):
  * deadpan, asks for more detail, shows no verdict or probability.
  */
@@ -150,19 +135,6 @@ export function explainOutcome(outcome: OracleOutcome, activityText: string): st
     case "verdict":
       return explainVerdict(outcome, activityText);
   }
-}
-
-/**
- * `DISCLAIMER_MESSAGE` when `outcome` is a disclaimer-flagged verdict,
- * `undefined` otherwise -- so the UI (main.ts) can render it as its own,
- * visibly separate element alongside (not folded into) the main explanation
- * sentence.
- */
-export function explainDisclaimer(outcome: OracleOutcome): string | undefined {
-  if (outcome.kind === "verdict" && outcome.disclaimer) {
-    return DISCLAIMER_MESSAGE;
-  }
-  return undefined;
 }
 
 /**

@@ -51,13 +51,16 @@ export type Noul = number;
  *   text). Always recuses. Checked with the highest priority of anything in
  *   `route` -- nothing overrides it into a verdict.
  * - `safety`, `legal`: always recuse, no exceptions.
- * - `health` (everything health-related EXCEPT the violence_person/self-harm
- *   case above -- self-harm is never merely "health"), `money`,
- *   `relationship_ending`, `job_quitting`: proceed to a real verdict, but
- *   flagged `disclaimer: true`.
- * - `violence_object`: violence/destruction directed at an inanimate object
- *   (e.g. "smash my printer"). Treated as a perfectly ordinary activity: no
- *   recusal, no disclaimer.
+ * - Everything else proceeds to a plain verdict. There is no middle tier:
+ *   per the project owner (oracle-ral), a question is either unacceptable
+ *   (recusal) or OK. `health` (everything health-related EXCEPT the
+ *   violence_person/self-harm case above -- self-harm is never merely
+ *   "health"), `money`, `relationship_ending`, `job_quitting` and
+ *   `violence_object` (e.g. "smash my printer") used to carry a disclaimer or
+ *   special note and now route exactly like `none`. They stay in the Choice
+ *   anyway so Jev has a correct home for those questions instead of being
+ *   pushed toward `safety`/`legal` (which would recuse) or mis-bucketed
+ *   elsewhere.
  * - `none`: not sensitive at all.
  */
 export type SensitivityCategory =
@@ -160,28 +163,19 @@ export type RecusalReason = "violence_person" | "safety" | "legal";
 /** Sensitivity buckets that always recuse, no exceptions, in priority order (highest first). */
 const RECUSAL_PRIORITY: readonly RecusalReason[] = ["violence_person", "safety", "legal"];
 
-/** Sensitivity buckets that proceed to a real verdict but flagged `disclaimer: true`. */
-const DISCLAIMER_SENSITIVITIES: ReadonlySet<SensitivityCategory> = new Set([
-  "health",
-  "money",
-  "relationship_ending",
-  "job_quitting",
-]);
-
 /**
  * The routing decision derived from a Call 1 classification (oracle-2au),
  * per spec section 2's priority order (highest first):
  * `violence_person` > `safety` > `legal` > vague >= `VAGUE_THRESHOLD` >
  * proceed. `violence_person` (which covers violence/harm toward a person or
  * animal, including the asker's own self-harm) is checked before anything
- * else and nothing can override it into a verdict. `proceed` carries
- * `disclaimer: true` for `health`/`money`/`relationship_ending`/
- * `job_quitting`, and `disclaimer: false` for `violence_object`/`none`.
+ * else and nothing can override it into a verdict. Every other bucket
+ * proceeds the same way (no disclaimer tier -- see `SensitivityCategory`).
  */
 export type RoutingDecision =
   | { kind: "recusal"; reason: RecusalReason }
   | { kind: "needs-detail" }
-  | { kind: "proceed"; category: RulingBody; disclaimer: boolean };
+  | { kind: "proceed"; category: RulingBody };
 
 /**
  * Pure routing function (no I/O, no oracle call) so both `StubOracle` and
@@ -197,11 +191,7 @@ export function route(classification: ClassificationResult): RoutingDecision {
   if (classification.vague >= VAGUE_THRESHOLD) {
     return { kind: "needs-detail" };
   }
-  return {
-    kind: "proceed",
-    category: classification.category,
-    disclaimer: DISCLAIMER_SENSITIVITIES.has(classification.sensitivity),
-  };
+  return { kind: "proceed", category: classification.category };
 }
 
 /**
@@ -224,13 +214,6 @@ export type OracleOutcome =
       moonPhase: MoonPhaseName;
       favor: Noul;
       intensity: Intensity;
-      /**
-       * True for the disclaimer-flagged sensitivity buckets (health, money,
-       * relationship_ending, job_quitting -- oracle-2au): the UI renders a
-       * visible disclaimer alongside the explanation for these. False for
-       * violence_object/none.
-       */
-      disclaimer: boolean;
     };
 
 /** Everything `askOracle` needs beyond the `Oracle` implementation itself. */
@@ -287,7 +270,6 @@ export async function askOracle(oracle: Oracle, context: OracleContext): Promise
     moonPhase,
     favor: verdictAnswer.favor,
     intensity: verdictAnswer.intensity,
-    disclaimer: decision.disclaimer,
   };
 }
 
@@ -511,8 +493,9 @@ const CATEGORY_KEYWORDS: Record<RulingBody, readonly string[]> = {
  * doctor's visit) without also adding it to `HEALTH_KEYWORDS` meant "Should
  * I go to the doctor for my checkup" would confidently classify as Saturn
  * *and* score "none" on sensitivity, sailing straight through to a verdict
- * instead of getting a disclaimer -- exactly the health-decision miss this
- * list exists to prevent. "doctor", "physician", and "checkup" are included
+ * with no health signal at all -- exactly the health-decision miss this
+ * list existed to prevent (it mattered more when health carried a
+ * disclaimer; oracle-ral removed that tier). "doctor", "physician", and "checkup" are included
  * for that reason (not "appointment": too generic -- it also covers
  * non-health meetings/dates). Every other oracle-d4i keyword was rechecked
  * for the same gap and judged not to need an entry here: Saturn's "bills"
@@ -626,6 +609,79 @@ const PERSON_TARGET_KEYWORDS: readonly string[] = [
  * of those have a word boundary immediately before "thing").
  */
 const OBJECT_TARGET_KEYWORDS: readonly string[] = ["printer", "wall", "phone", "computer", "furniture", "plate", "thing"];
+
+/**
+ * Eating an animal it isn't OK to eat (per the project owner: "should I eat
+ * a chicken" or "some fish" is ordinary food, "should I eat a cat" is a pet,
+ * so animal harm). Everything not listed here -- chicken, fish, beef, lamb,
+ * and any animal this list doesn't know -- stays ordinary food; the list is
+ * pets/companion animals, protected or endangered animals, and people.
+ * Rabbit/bunny, guinea pig and horse are eaten in some places but are
+ * listed anyway, since they're commonly pets and this module's bias is
+ * toward over-recusing ("false alarms are cheap, misses aren't funny").
+ *
+ * Only checked when one of these nouns is the *object* of an eating verb:
+ * the verb, then up to three filler words from a fixed list (articles,
+ * possessives, "raw", "pet", ...), then the animal. That keeps "eat dinner
+ * with my dog" and "eat a hot dog" ordinary (neither "dinner"/"with" nor
+ * "hot" is a filler word), and the whole-word match keeps "catfish" and
+ * "dogfish" food. The noun list also carries plurals explicitly for the
+ * same reason. An animal word followed by "food"/"treats"/"'s" etc. is a
+ * modifier ("eat dog food", "eat my friend's fries"), not the thing eaten.
+ */
+const NON_FOOD_ANIMAL_KEYWORDS: readonly string[] = [
+  "pets?",
+  "cats?",
+  "kittens?",
+  "kitty",
+  "kitties",
+  "dogs?",
+  "puppy",
+  "puppies",
+  "pupp?ers?",
+  "hamsters?",
+  "gerbils?",
+  "guinea pigs?",
+  "rabbits?",
+  "bunny",
+  "bunnies",
+  "ferrets?",
+  "parrots?",
+  "budgies?",
+  "parakeets?",
+  "goldfish",
+  "horses?",
+  "pony",
+  "ponies",
+  "dolphins?",
+  "whales?",
+  "pandas?",
+  "monkeys?",
+  "apes?",
+  "gorillas?",
+  "chimps?",
+  "chimpanzees?",
+  "elephants?",
+  "person",
+  "people",
+  "humans?",
+  // Only as the last word ("eat a baby"), so "eat baby carrots" and "baby
+  // back ribs" stay food; "eat a baby dolphin" is still caught via the
+  // filler word.
+  "bab(?:y|ies)(?!\\s+[a-z])",
+  "friends?",
+  "someone",
+  "somebody",
+];
+
+const EATING_VERB_PATTERN = "(?:eat|eats|eating|ate|eaten|cook|cooking|grill|grilling|roast|roasting|fry|frying|barbecue|bbq)";
+const EATING_FILLER_PATTERN =
+  "(?:a|an|the|some|my|your|his|her|their|our|this|that|these|those|raw|cooked|fried|grilled|roasted|roast|live|whole|pet|baby|little|cute|neighbor's|neighbour's)";
+/** "eat dog food", "eat pet treats", "eat puppy chow": the animal word is a modifier, not what's being eaten. */
+const ANIMAL_PRODUCT_PATTERN = "(?:'s|\\s+(?:food|treats?|kibble|biscuits?|chow))";
+const EATS_NON_FOOD_ANIMAL = new RegExp(
+  `\\b${EATING_VERB_PATTERN}\\s+(?:${EATING_FILLER_PATTERN}\\s+){0,3}(?:${NON_FOOD_ANIMAL_KEYWORDS.join("|")})\\b(?!${ANIMAL_PRODUCT_PATTERN})`,
+);
 
 /**
  * Word-boundary-aware keyword matching (reviewer-flagged bug in oracle-cne
@@ -785,7 +841,8 @@ function hasViolenceVerb(lowerText: string): boolean {
 /**
  * Classifies violence/harm language into `violence_person`, `violence_object`,
  * or `undefined` (no violence detected at all), per oracle-2au's heuristic:
- * 1. Any `SELF_HARM_KEYWORDS` phrase -> `violence_person`, unconditionally.
+ * 1. Any `SELF_HARM_KEYWORDS` phrase, or eating a pet/protected animal/person
+ *    (`EATS_NON_FOOD_ANIMAL`) -> `violence_person`, unconditionally.
  * 2. No violence verb present -> `undefined` (not a violence case).
  * 3. A violence verb plus a clear inanimate-object target and NO person/
  *    animal target -> `violence_object`.
@@ -802,7 +859,7 @@ function hasViolenceVerb(lowerText: string): boolean {
  * fixed keyword list).
  */
 function classifyViolence(lowerText: string): "violence_person" | "violence_object" | undefined {
-  if (matchesAny(lowerText, SELF_HARM_KEYWORDS)) {
+  if (matchesAny(lowerText, SELF_HARM_KEYWORDS) || EATS_NON_FOOD_ANIMAL.test(lowerText)) {
     return "violence_person";
   }
   if (!hasViolenceVerb(lowerText)) {
@@ -819,17 +876,11 @@ function classifyViolence(lowerText: string): "violence_person" | "violence_obje
 /**
  * Classifies the activity's `SensitivityCategory` (oracle-2au), checked in
  * the same priority order `route` uses for recusal (violence_person > safety
- * > legal), then the disclaimer buckets (health/money/relationship_ending/
- * job_quitting -- checked in that order, but since all four carry the same
- * `disclaimer: true` behavior, their relative order among each other has no
- * routing consequence), then `violence_object`, then `none`. Placing
- * `violence_object` after the disclaimer buckets (rather than checking it
- * right alongside `violence_person`) is deliberate: per spec, only
- * `violence_person` gets veto power over everything else -- an activity that
- * reads as both e.g. "money" and "violence_object" (unlikely in practice, but
- * not impossible for a keyword-based heuristic) should still get the
- * `money` disclaimer treatment, not fall through to ordinary/no-disclaimer
- * handling.
+ * > legal), then health/money/relationship_ending/job_quitting, then
+ * `violence_object`, then `none`. Since oracle-ral removed the disclaimer
+ * tier, every bucket after `legal` routes identically, so their relative
+ * order only affects which label the classification reports, not the
+ * outcome.
  */
 function classifySensitivity(lowerText: string): SensitivityCategory {
   const violence = classifyViolence(lowerText);
@@ -858,8 +909,8 @@ function classifySensitivity(lowerText: string): SensitivityCategory {
  * category keyword lists simply don't cover it, so keying vagueness off
  * `categoryMatched` alone would re-create the oracle-d4i bug class (keyword-
  * list gaps silently becoming false "too vague" needs-detail outcomes) for
- * exactly the disclaimer-bucket questions that must proceed to a verdict
- * per spec. A matched sensitivity bucket is therefore also treated as
+ * exactly the health/money/relationship/job questions that must proceed to
+ * a verdict per spec. A matched sensitivity bucket is therefore also treated as
  * evidence of specificity. This cannot undermine safety: the recusal buckets
  * (violence_person/safety/legal) are checked in `route` BEFORE vague, so a
  * recusing text never reaches the vague check regardless of what this
