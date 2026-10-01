@@ -50,8 +50,8 @@ interface ResolvedIntake {
  * either case.
  */
 async function runIntakeUntilOutcome(stage: HTMLElement): Promise<ResolvedIntake> {
-  // Static markup only -- brownieUrl is a build-time constant, nothing
-  // user-supplied is interpolated here. Layout per the owner's landing-page
+  // Static markup only -- brownieUrl and BASE_URL are build-time constants,
+  // nothing user-supplied is interpolated here. Layout per the owner's landing-page
   // sketch (oracle-rq3): a black starfield fills the page, the brownie sits
   // behind the sparkly, arched, sprinkle-colored "Cosmic JEV" title only, and the form floats below.
   stage.innerHTML = `
@@ -67,8 +67,13 @@ async function runIntakeUntilOutcome(stage: HTMLElement): Promise<ResolvedIntake
       </header>
       <div id="intake-notice"></div>
       <div id="intake-form-host"></div>
+      <a class="extension-link" href="https://github.com/dgabriel/cosmic-jev-extension#readme" target="_blank" rel="noopener noreferrer">
+        <img src="${import.meta.env.BASE_URL}favicon.svg" alt="" width="20" height="20" />
+        <span>Get the Chrome extension: JEV rates events on Luma, Eventbrite &amp; Meetup</span>
+      </a>
       <a class="about-link" href="https://github.com/dgabriel/cosmic-jev#readme" target="_blank" rel="noopener noreferrer">About this project</a>
       <p class="intake-credit">City data from <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a> (CC BY 4.0)</p>
+      <p class="intake-privacy">Privacy: your birth date, time and city stay in this browser. Only your question and a few computed planet angles are sent to Jev (TypeSafe, via OpenRouter). Our server keeps your IP address and each request's cost, to cap spending, and nothing else.</p>
     </div>
   `;
   requireElementOfType("intake-title-box", HTMLElement).style.backgroundImage = `url(${brownieUrl})`;

@@ -460,6 +460,41 @@ button[type="submit"]:hover {
   color: inherit;
 }
 
+/* Kept accurate to what actually leaves the browser: see askOracle (src/oracle.ts) for what Jev receives and worker/spendLedger.ts for what the Worker stores. */
+.intake-privacy {
+  max-width: 26rem;
+  margin: -1rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Kept findable on purpose (project owner): sits right under the form/result, not in the footer. */
+.extension-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 26rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(20, 18, 32, 0.7);
+  color: #fff8e7;
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.extension-link img {
+  flex: none;
+}
+
+.extension-link:hover,
+.extension-link:focus-visible {
+  border-color: var(--color-acid-green);
+  color: #fff;
+}
+
 .about-link {
   color: rgba(255, 255, 255, 0.75);
   font-size: 0.85rem;

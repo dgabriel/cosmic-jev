@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- A lil brownie: chocolate square, darker side for depth, chunky sprinkles in the title's colors. -->
+  <rect x="10" y="18" width="108" height="100" rx="18" fill="#3b2114"/>
+  <rect x="10" y="10" width="108" height="96" rx="18" fill="#6b3f24"/>
+  <rect x="18" y="16" width="92" height="20" rx="10" fill="#7d4b2c" opacity="0.7"/>
+  <g stroke-linecap="round" stroke-width="13">
+    <line x1="30" y1="34" x2="46" y2="28" stroke="#ef5a57"/>
+    <line x1="70" y1="26" x2="84" y2="38" stroke="#f7c90a"/>
+    <line x1="92" y1="62" x2="102" y2="78" stroke="#7cc8ee"/>
+    <line x1="28" y1="72" x2="44" y2="80" stroke="#b9dc4c"/>
+    <line x1="58" y1="58" x2="74" y2="54" stroke="#f39fc3"/>
+    <line x1="56" y1="88" x2="72" y2="94" stroke="#f59331"/>
+  </g>
+</svg>

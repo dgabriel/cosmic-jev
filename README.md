@@ -90,7 +90,10 @@ puzzle-piece icon and pin "Cosmic JEV for Eventbrite."
 
 ## Privacy
 
-Nothing about you is stored server-side. Birth details you enter live only in
-your browser's `localStorage` (web app) or `chrome.storage.local` (extension)
-— never sent anywhere except as part of a live Jev request, and never
-persisted by the Worker.
+Birth details you enter live only in your browser's `localStorage` (web app)
+or `chrome.storage.local` (extension). The web app never sends them: Jev
+receives your question plus computed chart results (the ruling planet's
+position, its aspects to your natal Sun and Moon, the Moon phase), via the
+Worker and OpenRouter. The Worker stores one thing per request, for the spend
+cap: your IP address (IPv6 collapsed to its /64) and that request's cost. The
+same note appears at the bottom of the app.
