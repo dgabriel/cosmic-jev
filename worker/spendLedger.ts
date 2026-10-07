@@ -34,13 +34,17 @@
 export const SPEND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 export const SPEND_WINDOW_DAYS = 7;
 
-/** Cap applied when SPEND_CAP_USD_PER_IP is unset. Roughly 800 typical calls. */
+/**
+ * Cap applied when SPEND_CAP_USD_PER_IP is unset. About 158 full questions
+ * (two calls each, ~$0.000063 together) at the costs observed on 2026-10-07
+ * (docs/examples/jev-calls-2026-10-07.json).
+ */
 export const DEFAULT_CAP_USD = 0.01;
 
 /**
  * Charged when a proxied upstream success carries no numeric usage.cost. Set
- * well above the observed typical cost (~$0.000012/call) so malformed replies
- * are never a discount.
+ * well above the observed per-call cost ($0.000040 for Call 1, $0.000023 for
+ * Call 2 on 2026-10-07) so malformed replies are never a discount.
  */
 export const FALLBACK_CHARGE_USD = 0.0001;
 

@@ -222,6 +222,10 @@ button[type="submit"]:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.ledger-table-wrap {
+  overflow-x: auto;
+}
+
 .ledger-table {
   width: 100%;
   margin-top: 1rem;
@@ -248,6 +252,38 @@ button[type="submit"]:hover {
 .ledger-table td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.ledger-notes {
+  margin-top: 2rem;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+}
+
+.ledger-notes h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+}
+
+.ledger-notes h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ledger-notes ol,
+.ledger-notes ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.ledger-notes li + li {
+  margin-top: 0.5rem;
 }
 
 /*

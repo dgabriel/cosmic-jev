@@ -22,6 +22,41 @@ interface AdminSnapshot {
 
 const REFRESH_MS = 30_000;
 
+/**
+ * Observed cost of one full question: Call 1 ($0.000040194) + Call 2
+ * ($0.000022806), from docs/examples/jev-calls-2026-10-07.json. Only used to
+ * estimate how many questions the cap allows; the meter itself charges each
+ * reply's exact usage.cost.
+ */
+const TYPICAL_QUESTION_USD = 0.000063;
+
+/**
+ * How the meter works, transcribed from worker/handler.ts and
+ * worker/spendLedger.ts (a separate deploy target, so nothing is imported).
+ * The $0.0001 fallback is spendLedger.ts's FALLBACK_CHARGE_USD; keep in sync.
+ */
+const HOW_IT_WORKS = [
+  "Each request is bucketed by network: the caller's IP address, or its /64 prefix for IPv6. " +
+    "A missing or malformed address shares one capped \"unknown\" bucket. The bucket name and the " +
+    "charges are all that is stored: no birthdates, no questions.",
+  "Before calling Jev, the Worker asks the ledger for that bucket's spend over the last 7 days. " +
+    "At or over the cap, the request gets a 429 and Jev is never called.",
+  "After Jev answers, the Worker charges the exact usage.cost OpenRouter reported: about $0.000040 " +
+    "for the classify call and $0.000023 for the verdict call. A reply without a cost is charged a " +
+    "$0.0001 fallback. Failed calls cost nothing.",
+  "Charges older than 7 days are folded into each network's all-time total and drop out of the " +
+    "rolling window.",
+];
+
+const FINE_PRINT = [
+  "A full question is two calls, about $0.000063. Recusals and \"too vague\" stop after the first call.",
+  "Operator IPs are exempt from the cap and hidden from this table, but still counted in all-time spend.",
+  "The cap can be overshot slightly: requests in flight at the same moment can all pass the check " +
+    "before any of them is charged.",
+  "If the ledger is down at check time, the Worker refuses (503) rather than serve unbilled calls. " +
+    "If a charge fails to record, the asker still gets an answer and that call goes unmetered.",
+];
+
 /** Adaptive precision: tiny amounts show digits, big ones look like money. */
 function formatUsd(usd: number): string {
   if (usd === 0) return "$0";
@@ -56,15 +91,29 @@ const status = el("p", { className: "hint", text: "Checking the meter…" });
 status.setAttribute("aria-live", "polite");
 app.appendChild(status);
 
-const tableWrap = el("div");
+const tableWrap = el("div", { className: "ledger-table-wrap" });
 app.appendChild(tableWrap);
+
+const notes = el("section", { className: "ledger-notes" });
+notes.appendChild(el("h2", { text: "How the meter works" }));
+const steps = el("ol");
+for (const text of HOW_IT_WORKS) steps.appendChild(el("li", { text }));
+notes.appendChild(steps);
+notes.appendChild(el("h3", { text: "Fine print" }));
+const finePrint = el("ul");
+for (const text of FINE_PRINT) finePrint.appendChild(el("li", { text }));
+notes.appendChild(finePrint);
+app.appendChild(notes);
 
 function renderSnapshot(snapshot: AdminSnapshot): void {
   tableWrap.replaceChildren();
   summary.textContent =
     `All-time spend: ${formatUsd(snapshot.total_usd)} · ` +
     `cap per network: ${snapshot.cap_usd === null ? "misconfigured" : formatUsd(snapshot.cap_usd)} ` +
-    `per ${snapshot.window_days} days`;
+    `per ${snapshot.window_days} days` +
+    (snapshot.cap_usd === null
+      ? ""
+      : ` (≈ ${Math.floor(snapshot.cap_usd / TYPICAL_QUESTION_USD)} questions)`);
 
   if (snapshot.buckets.length === 0) {
     tableWrap.appendChild(el("p", { className: "hint", text: "No charges yet. The stars have cost nothing." }));
