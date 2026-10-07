@@ -75,7 +75,7 @@ npx wrangler deploy --dry-run --outdir /tmp/wr --config worker/wrangler.toml   #
 
 ## Architecture Overview
 
-Cosmic Oracle: a Vite + TypeScript SPA that turns a birthdate and an activity into a 👍/👎 "verdict" from real planetary positions (`astronomy-engine`), interpreted by TypeSafe's Jev model through OpenRouter. A Cloudflare Worker proxies Jev calls so the API key never ships to the client.
+Cosmic JEV: a Vite + TypeScript SPA that turns a birthdate and an activity into a 👍/👎 "verdict" from real planetary positions (`astronomy-engine`), interpreted by TypeSafe's Jev model through OpenRouter. A Cloudflare Worker proxies Jev calls so the API key never ships to the client.
 
 - `src/sky.ts` — astronomy module (the part that must be correct)
 - `src/oracle.ts` — `Oracle` interface, `JevOracle`, `StubOracle`

@@ -1,17 +1,22 @@
 # Cosmic JEV
 
-Cosmic JEV (né Cosmic Oracle) is an art piece framed as haruspicy: you give it
-a birthdate and an activity, it sacrifices the question to real planetary
-positions, and [TypeSafe's Jev model](https://openrouter.ai/) hands back a
-👍/👎 verdict. A Cloudflare Worker proxies the Jev/OpenRouter calls so the API
-key never ships to the browser.
+Cosmic JEV is an art piece framed as haruspicy: you give it a birthdate and an
+activity, it sacrifices the question to real planetary positions, and
+[TypeSafe's Jev model](https://openrouter.ai/) hands back a 👍/👎 verdict. A
+Cloudflare Worker proxies the Jev/OpenRouter calls so the API key never ships
+to the browser.
+
+(The project's working title was "Cosmic Oracle". That name survives only in
+deployed identifiers that would break if renamed: the
+`cosmic-oracle-worker` Worker URL and the `oracle-*` issue prefix.)
 
 Live site: https://dawngabriel.com/cosmic-jev/ (also mirrored at
 https://dgabriel.github.io/cosmic-jev/).
 
 See [`docs/spec.md`](docs/spec.md) for the full project brief and routing
-rules, and [`docs/jev-openrouter.md`](docs/jev-openrouter.md) for the Jev API
-notes.
+rules, and [`docs/jev-openrouter.md`](docs/jev-openrouter.md) for how the Jev
+calls work: diagrams, real captured request/response bodies, and the verified
+API reference.
 
 ## Running it locally
 

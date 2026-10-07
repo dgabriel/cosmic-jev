@@ -1,0 +1,578 @@
+{
+  "note": "Real calls captured 2026-10-07 by running src/oracle.ts askOracle() with JevOracle against the deployed Worker. Each run records the browser->Worker request body and the Worker->browser response. Sample natal chart: born 1990-07-14, no birth time or location.",
+  "birth": "1990-07-14 (no time/location)",
+  "runs": [
+    {
+      "activityText": "Should I work late tonight",
+      "outcome": {
+        "kind": "verdict",
+        "category": "Saturn",
+        "rulingBodyTransit": {
+          "body": "Saturn",
+          "longitude": 11.050763605494124,
+          "sign": "Aries",
+          "degreeInSign": 11.050763605494124,
+          "retrograde": true
+        },
+        "aspects": [
+          {
+            "transit": "Saturn",
+            "natal": "Moon",
+            "aspect": "conjunction",
+            "orb": 1.7023610050000784,
+            "applying": true
+          }
+        ],
+        "moonPhase": "waning crescent",
+        "favor": 0.27,
+        "intensity": 0.6725
+      },
+      "calls": [
+        {
+          "url": "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/api/decide",
+          "status": 200,
+          "ms": 388,
+          "request": {
+            "state": "Should I work late tonight",
+            "questions": {
+              "category": {
+                "type": "choice",
+                "instructions": "Which celestial body rules this activity?",
+                "criteria": {
+                  "Mars": "Sports, exercise, competition, confrontation, bold new starts.",
+                  "Venus": "Romance, dating, art, beauty, fashion, socializing, treats.",
+                  "Mercury": "Communication, writing, emails, short trips, tech, contracts.",
+                  "Jupiter": "Learning, long travel, games of chance, celebrations.",
+                  "Saturn": "Work, chores, commitments, long-term planning.",
+                  "Moon": "Home, cooking, family, rest, self-care.",
+                  "Sun": "Performance, creative self-expression, being the center of attention."
+                }
+              },
+              "sensitivity": {
+                "type": "choice",
+                "instructions": "Classify this activity's sensitivity. Check for violence or harm to a person or animal (including self-harm) first -- that always wins over every other category. Otherwise pick whichever single category best applies, or 'none' if nothing applies.",
+                "criteria": {
+                  "violence_person": "Violence, harm, or aggression directed at a person or animal -- including the asker harming themselves (self-harm, suicide, or wanting to end their own life), and eating an animal that isn't ordinary food: a pet or companion animal (cat, dog, rabbit, hamster, horse), a protected or endangered animal (dolphin, whale, panda, ape), or a person. Eating ordinary food animals (chicken, fish, beef, pork, lamb, seafood) is NOT harm. Always pick this over health/safety/legal if it applies.",
+                  "safety": "A decision about physical safety or risk of injury, not otherwise about violence toward a person, animal, or object.",
+                  "legal": "A decision with legal consequences: lawsuits, contracts with legal weight, breaking the law, legal advice.",
+                  "health": "A decision about physical or mental health, medication, medical treatment, surgery, or diagnosis -- not self-harm.",
+                  "money": "A significant financial decision: investing, borrowing, a loan or mortgage, savings, or debt.",
+                  "relationship_ending": "A decision about ending a romantic relationship or marriage (breakup, divorce).",
+                  "job_quitting": "A decision about quitting or resigning from a job.",
+                  "violence_object": "Violence, force, or destruction directed only at an inanimate object or thing (e.g. smashing a printer) -- never at a person or animal, and not self-harm.",
+                  "none": "None of the above: an ordinary activity with no special real-life-consequence or safety concern, including eating ordinary food such as chicken, fish, beef, pork, or lamb."
+                }
+              },
+              "vague": {
+                "type": "noul",
+                "instructions": "Is this activity description too vague to categorize?"
+              }
+            }
+          },
+          "response": {
+            "id": "gen-dec-1791389938-p5CRq7OQKy4bWwB5daLi",
+            "model": "typesafe/jev-1.13-20260917",
+            "provider": "TypeSafe",
+            "answers": {
+              "category": {
+                "type": "choice",
+                "choice": "Saturn",
+                "probabilities": {
+                  "Saturn": 0.98,
+                  "Moon": 0.02,
+                  "Jupiter": 0,
+                  "Venus": 0,
+                  "Mars": 0,
+                  "Sun": 0,
+                  "Mercury": 0
+                },
+                "confidence": 0.98
+              },
+              "sensitivity": {
+                "type": "choice",
+                "choice": "none",
+                "probabilities": {
+                  "none": 0.68,
+                  "job_quitting": 0,
+                  "violence_person": 0,
+                  "health": 0.29,
+                  "money": 0.01,
+                  "violence_object": 0,
+                  "relationship_ending": 0,
+                  "safety": 0.02,
+                  "legal": 0
+                },
+                "confidence": 0.64
+              },
+              "vague": {
+                "type": "noul",
+                "noul": 0.69
+              }
+            },
+            "usage": {
+              "input_tokens": 957,
+              "output_tokens": 180,
+              "cost": 0.000040194
+            }
+          }
+        },
+        {
+          "url": "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/api/decide",
+          "status": 200,
+          "ms": 338,
+          "request": {
+            "state": {
+              "category": "Saturn",
+              "rulingBodyTransit": {
+                "body": "Saturn",
+                "longitude": 11.050763605494124,
+                "sign": "Aries",
+                "degreeInSign": 11.050763605494124,
+                "retrograde": true
+              },
+              "aspects": [
+                {
+                  "transit": "Saturn",
+                  "natal": "Moon",
+                  "aspect": "conjunction",
+                  "orb": 1.7023610050000784,
+                  "applying": true
+                }
+              ],
+              "moonPhase": "waning crescent",
+              "activityText": "Should I work late tonight"
+            },
+            "questions": {
+              "favor": {
+                "type": "noul",
+                "instructions": "Do the stars favor this activity for this person today?"
+              },
+              "intensity": {
+                "type": "score",
+                "instructions": "How intense are today's cosmic influences on this activity?",
+                "criteria": [
+                  "Barely a cosmic murmur",
+                  "A mild celestial nudge",
+                  "A noticeable planetary pull",
+                  "A strong astral push",
+                  "An overwhelming cosmic surge"
+                ]
+              }
+            }
+          },
+          "response": {
+            "id": "gen-dec-1791389939-8zLvHni0iVSTx2Vp0zdh",
+            "model": "typesafe/jev-1.13-20260917",
+            "provider": "TypeSafe",
+            "answers": {
+              "favor": {
+                "type": "noul",
+                "noul": 0.27
+              },
+              "intensity": {
+                "type": "score",
+                "score": 2.69,
+                "legend": {
+                  "0": "Barely a cosmic murmur",
+                  "1": "A mild celestial nudge",
+                  "2": "A noticeable planetary pull",
+                  "3": "A strong astral push",
+                  "4": "An overwhelming cosmic surge"
+                },
+                "probabilities": {
+                  "0": 0,
+                  "1": 0.01,
+                  "2": 0.28,
+                  "3": 0.7,
+                  "4": 0.01
+                },
+                "confidence": 0.74
+              }
+            },
+            "usage": {
+              "input_tokens": 543,
+              "output_tokens": 35,
+              "cost": 0.000022806
+            }
+          }
+        }
+      ],
+      "capturedAt": "2026-10-07T16:18:58.743Z"
+    },
+    {
+      "activityText": "Should I go bowling tonight",
+      "outcome": {
+        "kind": "verdict",
+        "category": "Mars",
+        "rulingBodyTransit": {
+          "body": "Mars",
+          "longitude": 125.53555227879139,
+          "sign": "Leo",
+          "degreeInSign": 5.535552278791386,
+          "retrograde": false
+        },
+        "aspects": [],
+        "moonPhase": "waning crescent",
+        "favor": 0.4,
+        "intensity": 0.1625
+      },
+      "calls": [
+        {
+          "url": "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/api/decide",
+          "status": 200,
+          "ms": 748,
+          "request": {
+            "state": "Should I go bowling tonight",
+            "questions": {
+              "category": {
+                "type": "choice",
+                "instructions": "Which celestial body rules this activity?",
+                "criteria": {
+                  "Mars": "Sports, exercise, competition, confrontation, bold new starts.",
+                  "Venus": "Romance, dating, art, beauty, fashion, socializing, treats.",
+                  "Mercury": "Communication, writing, emails, short trips, tech, contracts.",
+                  "Jupiter": "Learning, long travel, games of chance, celebrations.",
+                  "Saturn": "Work, chores, commitments, long-term planning.",
+                  "Moon": "Home, cooking, family, rest, self-care.",
+                  "Sun": "Performance, creative self-expression, being the center of attention."
+                }
+              },
+              "sensitivity": {
+                "type": "choice",
+                "instructions": "Classify this activity's sensitivity. Check for violence or harm to a person or animal (including self-harm) first -- that always wins over every other category. Otherwise pick whichever single category best applies, or 'none' if nothing applies.",
+                "criteria": {
+                  "violence_person": "Violence, harm, or aggression directed at a person or animal -- including the asker harming themselves (self-harm, suicide, or wanting to end their own life), and eating an animal that isn't ordinary food: a pet or companion animal (cat, dog, rabbit, hamster, horse), a protected or endangered animal (dolphin, whale, panda, ape), or a person. Eating ordinary food animals (chicken, fish, beef, pork, lamb, seafood) is NOT harm. Always pick this over health/safety/legal if it applies.",
+                  "safety": "A decision about physical safety or risk of injury, not otherwise about violence toward a person, animal, or object.",
+                  "legal": "A decision with legal consequences: lawsuits, contracts with legal weight, breaking the law, legal advice.",
+                  "health": "A decision about physical or mental health, medication, medical treatment, surgery, or diagnosis -- not self-harm.",
+                  "money": "A significant financial decision: investing, borrowing, a loan or mortgage, savings, or debt.",
+                  "relationship_ending": "A decision about ending a romantic relationship or marriage (breakup, divorce).",
+                  "job_quitting": "A decision about quitting or resigning from a job.",
+                  "violence_object": "Violence, force, or destruction directed only at an inanimate object or thing (e.g. smashing a printer) -- never at a person or animal, and not self-harm.",
+                  "none": "None of the above: an ordinary activity with no special real-life-consequence or safety concern, including eating ordinary food such as chicken, fish, beef, pork, or lamb."
+                }
+              },
+              "vague": {
+                "type": "noul",
+                "instructions": "Is this activity description too vague to categorize?"
+              }
+            }
+          },
+          "response": {
+            "id": "gen-dec-1791389906-LLT2aPrkKuPNvgMvAy02",
+            "model": "typesafe/jev-1.13-20260917",
+            "provider": "TypeSafe",
+            "answers": {
+              "category": {
+                "type": "choice",
+                "choice": "Mars",
+                "probabilities": {
+                  "Sun": 0,
+                  "Venus": 0.06,
+                  "Mars": 0.81,
+                  "Mercury": 0,
+                  "Jupiter": 0.11,
+                  "Saturn": 0,
+                  "Moon": 0.01
+                },
+                "confidence": 0.78
+              },
+              "sensitivity": {
+                "type": "choice",
+                "choice": "none",
+                "probabilities": {
+                  "health": 0,
+                  "violence_person": 0,
+                  "violence_object": 0,
+                  "legal": 0,
+                  "relationship_ending": 0,
+                  "none": 0.98,
+                  "safety": 0.02,
+                  "job_quitting": 0,
+                  "money": 0
+                },
+                "confidence": 0.98
+              },
+              "vague": {
+                "type": "noul",
+                "noul": 0.3
+              }
+            },
+            "usage": {
+              "input_tokens": 957,
+              "output_tokens": 179,
+              "cost": 0.000040194
+            }
+          }
+        },
+        {
+          "url": "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/api/decide",
+          "status": 200,
+          "ms": 351,
+          "request": {
+            "state": {
+              "category": "Mars",
+              "rulingBodyTransit": {
+                "body": "Mars",
+                "longitude": 125.53555227879139,
+                "sign": "Leo",
+                "degreeInSign": 5.535552278791386,
+                "retrograde": false
+              },
+              "aspects": [],
+              "moonPhase": "waning crescent",
+              "activityText": "Should I go bowling tonight"
+            },
+            "questions": {
+              "favor": {
+                "type": "noul",
+                "instructions": "Do the stars favor this activity for this person today?"
+              },
+              "intensity": {
+                "type": "score",
+                "instructions": "How intense are today's cosmic influences on this activity?",
+                "criteria": [
+                  "Barely a cosmic murmur",
+                  "A mild celestial nudge",
+                  "A noticeable planetary pull",
+                  "A strong astral push",
+                  "An overwhelming cosmic surge"
+                ]
+              }
+            }
+          },
+          "response": {
+            "id": "gen-dec-1791389906-Wm3w8lih4IedG3YxElPY",
+            "model": "typesafe/jev-1.13-20260917",
+            "provider": "TypeSafe",
+            "answers": {
+              "favor": {
+                "type": "noul",
+                "noul": 0.4
+              },
+              "intensity": {
+                "type": "score",
+                "score": 0.65,
+                "legend": {
+                  "0": "Barely a cosmic murmur",
+                  "1": "A mild celestial nudge",
+                  "2": "A noticeable planetary pull",
+                  "3": "A strong astral push",
+                  "4": "An overwhelming cosmic surge"
+                },
+                "probabilities": {
+                  "0": 0.44,
+                  "1": 0.48,
+                  "2": 0.08,
+                  "3": 0,
+                  "4": 0
+                },
+                "confidence": 0.57
+              }
+            },
+            "usage": {
+              "input_tokens": 477,
+              "output_tokens": 35,
+              "cost": 0.000020034
+            }
+          }
+        }
+      ],
+      "capturedAt": "2026-10-07T16:18:26.119Z"
+    },
+    {
+      "activityText": "Should I punch my neighbor",
+      "outcome": {
+        "kind": "recusal"
+      },
+      "calls": [
+        {
+          "url": "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/api/decide",
+          "status": 200,
+          "ms": 252,
+          "request": {
+            "state": "Should I punch my neighbor",
+            "questions": {
+              "category": {
+                "type": "choice",
+                "instructions": "Which celestial body rules this activity?",
+                "criteria": {
+                  "Mars": "Sports, exercise, competition, confrontation, bold new starts.",
+                  "Venus": "Romance, dating, art, beauty, fashion, socializing, treats.",
+                  "Mercury": "Communication, writing, emails, short trips, tech, contracts.",
+                  "Jupiter": "Learning, long travel, games of chance, celebrations.",
+                  "Saturn": "Work, chores, commitments, long-term planning.",
+                  "Moon": "Home, cooking, family, rest, self-care.",
+                  "Sun": "Performance, creative self-expression, being the center of attention."
+                }
+              },
+              "sensitivity": {
+                "type": "choice",
+                "instructions": "Classify this activity's sensitivity. Check for violence or harm to a person or animal (including self-harm) first -- that always wins over every other category. Otherwise pick whichever single category best applies, or 'none' if nothing applies.",
+                "criteria": {
+                  "violence_person": "Violence, harm, or aggression directed at a person or animal -- including the asker harming themselves (self-harm, suicide, or wanting to end their own life), and eating an animal that isn't ordinary food: a pet or companion animal (cat, dog, rabbit, hamster, horse), a protected or endangered animal (dolphin, whale, panda, ape), or a person. Eating ordinary food animals (chicken, fish, beef, pork, lamb, seafood) is NOT harm. Always pick this over health/safety/legal if it applies.",
+                  "safety": "A decision about physical safety or risk of injury, not otherwise about violence toward a person, animal, or object.",
+                  "legal": "A decision with legal consequences: lawsuits, contracts with legal weight, breaking the law, legal advice.",
+                  "health": "A decision about physical or mental health, medication, medical treatment, surgery, or diagnosis -- not self-harm.",
+                  "money": "A significant financial decision: investing, borrowing, a loan or mortgage, savings, or debt.",
+                  "relationship_ending": "A decision about ending a romantic relationship or marriage (breakup, divorce).",
+                  "job_quitting": "A decision about quitting or resigning from a job.",
+                  "violence_object": "Violence, force, or destruction directed only at an inanimate object or thing (e.g. smashing a printer) -- never at a person or animal, and not self-harm.",
+                  "none": "None of the above: an ordinary activity with no special real-life-consequence or safety concern, including eating ordinary food such as chicken, fish, beef, pork, or lamb."
+                }
+              },
+              "vague": {
+                "type": "noul",
+                "instructions": "Is this activity description too vague to categorize?"
+              }
+            }
+          },
+          "response": {
+            "id": "gen-dec-1791389907-k5hjNg3OaRLFVMzzWCOG",
+            "model": "typesafe/jev-1.13-20260917",
+            "provider": "TypeSafe",
+            "answers": {
+              "category": {
+                "type": "choice",
+                "choice": "Mars",
+                "probabilities": {
+                  "Moon": 0,
+                  "Mercury": 0,
+                  "Jupiter": 0,
+                  "Sun": 0,
+                  "Venus": 0,
+                  "Mars": 1,
+                  "Saturn": 0
+                },
+                "confidence": 1
+              },
+              "sensitivity": {
+                "type": "choice",
+                "choice": "violence_person",
+                "probabilities": {
+                  "relationship_ending": 0,
+                  "money": 0,
+                  "none": 0,
+                  "safety": 0,
+                  "violence_person": 1,
+                  "job_quitting": 0,
+                  "health": 0,
+                  "violence_object": 0,
+                  "legal": 0
+                },
+                "confidence": 1
+              },
+              "vague": {
+                "type": "noul",
+                "noul": 0.37
+              }
+            },
+            "usage": {
+              "input_tokens": 957,
+              "output_tokens": 181,
+              "cost": 0.000040194
+            }
+          }
+        }
+      ],
+      "capturedAt": "2026-10-07T16:18:26.119Z"
+    },
+    {
+      "activityText": "Should I do the thing",
+      "outcome": {
+        "kind": "needs-detail"
+      },
+      "calls": [
+        {
+          "url": "https://cosmic-oracle-worker.cosmic-oracle.workers.dev/api/decide",
+          "status": 200,
+          "ms": 274,
+          "request": {
+            "state": "Should I do the thing",
+            "questions": {
+              "category": {
+                "type": "choice",
+                "instructions": "Which celestial body rules this activity?",
+                "criteria": {
+                  "Mars": "Sports, exercise, competition, confrontation, bold new starts.",
+                  "Venus": "Romance, dating, art, beauty, fashion, socializing, treats.",
+                  "Mercury": "Communication, writing, emails, short trips, tech, contracts.",
+                  "Jupiter": "Learning, long travel, games of chance, celebrations.",
+                  "Saturn": "Work, chores, commitments, long-term planning.",
+                  "Moon": "Home, cooking, family, rest, self-care.",
+                  "Sun": "Performance, creative self-expression, being the center of attention."
+                }
+              },
+              "sensitivity": {
+                "type": "choice",
+                "instructions": "Classify this activity's sensitivity. Check for violence or harm to a person or animal (including self-harm) first -- that always wins over every other category. Otherwise pick whichever single category best applies, or 'none' if nothing applies.",
+                "criteria": {
+                  "violence_person": "Violence, harm, or aggression directed at a person or animal -- including the asker harming themselves (self-harm, suicide, or wanting to end their own life), and eating an animal that isn't ordinary food: a pet or companion animal (cat, dog, rabbit, hamster, horse), a protected or endangered animal (dolphin, whale, panda, ape), or a person. Eating ordinary food animals (chicken, fish, beef, pork, lamb, seafood) is NOT harm. Always pick this over health/safety/legal if it applies.",
+                  "safety": "A decision about physical safety or risk of injury, not otherwise about violence toward a person, animal, or object.",
+                  "legal": "A decision with legal consequences: lawsuits, contracts with legal weight, breaking the law, legal advice.",
+                  "health": "A decision about physical or mental health, medication, medical treatment, surgery, or diagnosis -- not self-harm.",
+                  "money": "A significant financial decision: investing, borrowing, a loan or mortgage, savings, or debt.",
+                  "relationship_ending": "A decision about ending a romantic relationship or marriage (breakup, divorce).",
+                  "job_quitting": "A decision about quitting or resigning from a job.",
+                  "violence_object": "Violence, force, or destruction directed only at an inanimate object or thing (e.g. smashing a printer) -- never at a person or animal, and not self-harm.",
+                  "none": "None of the above: an ordinary activity with no special real-life-consequence or safety concern, including eating ordinary food such as chicken, fish, beef, pork, or lamb."
+                }
+              },
+              "vague": {
+                "type": "noul",
+                "instructions": "Is this activity description too vague to categorize?"
+              }
+            }
+          },
+          "response": {
+            "id": "gen-dec-1791389907-jWuN2IN88kHvqn1ks2jC",
+            "model": "typesafe/jev-1.13-20260917",
+            "provider": "TypeSafe",
+            "answers": {
+              "category": {
+                "type": "choice",
+                "choice": "Mercury",
+                "probabilities": {
+                  "Mars": 0.26,
+                  "Venus": 0.01,
+                  "Mercury": 0.42,
+                  "Sun": 0.02,
+                  "Moon": 0.05,
+                  "Saturn": 0.19,
+                  "Jupiter": 0.05
+                },
+                "confidence": 0.32
+              },
+              "sensitivity": {
+                "type": "choice",
+                "choice": "none",
+                "probabilities": {
+                  "legal": 0,
+                  "health": 0,
+                  "relationship_ending": 0,
+                  "safety": 0,
+                  "money": 0,
+                  "violence_person": 0,
+                  "none": 1,
+                  "violence_object": 0,
+                  "job_quitting": 0
+                },
+                "confidence": 1
+              },
+              "vague": {
+                "type": "noul",
+                "noul": 0.93
+              }
+            },
+            "usage": {
+              "input_tokens": 957,
+              "output_tokens": 180,
+              "cost": 0.000040194
+            }
+          }
+        }
+      ],
+      "capturedAt": "2026-10-07T16:18:26.119Z"
+    }
+  ]
+}

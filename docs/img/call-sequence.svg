@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 690" role="img" aria-label="One Cosmic JEV question is two round trips from the browser through the Worker to OpenRouter's Jev model. The routing decision between Call 1 and Call 2 happens locally in the browser, and the API key only exists on the Worker side.">
+  <style>
+    svg { --bg: #ffffff; --fg: #1f2330; --muted: #6b7080; --line: #c9ccd6; --accent: #6d28d9; --accent-bg: #f1ebfd; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg: #14161d; --fg: #e8e9ee; --muted: #9a9fb0; --line: #3a3e4c; --accent: #b79cff; --accent-bg: #2a2140; }
+    }
+    .bg { fill: var(--bg); }
+    .box { fill: var(--bg); stroke: var(--fg); stroke-width: 1.5; }
+    .local { fill: var(--bg); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .decide { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 2; }
+    .life { stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 2 4; }
+    .act { fill: var(--line); }
+    .req { stroke: var(--fg); stroke-width: 1.6; fill: none; }
+    .res { stroke: var(--fg); stroke-width: 1.6; fill: none; stroke-dasharray: 6 4; }
+    .trust { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 8 5; }
+    .head { fill: var(--fg); stroke: none; }
+    text { fill: var(--fg); font-size: 13px; }
+    .title { font-size: 18px; font-weight: 700; }
+    .h { font-size: 15px; font-weight: 700; }
+    .sub { fill: var(--muted); font-size: 12px; }
+    .lbl { font-weight: 600; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+    .note { fill: var(--muted); font-size: 12px; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+    .acc { fill: var(--accent); font-weight: 700; }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path class="head" d="M0 0 L10 5 L0 10 z"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="980" height="690"/>
+  <text class="title" x="30" y="34">One question = two round trips (or one)</text>
+
+  <!-- participants -->
+  <rect class="box" x="50" y="56" width="240" height="56" rx="8"/>
+  <text class="h" x="170" y="80" text-anchor="middle">Browser</text>
+  <text class="sub" x="170" y="99" text-anchor="middle">sky.ts · oracle.ts · JevOracle</text>
+
+  <rect class="box" x="380" y="56" width="240" height="56" rx="8"/>
+  <text class="h" x="500" y="80" text-anchor="middle">Cloudflare Worker</text>
+  <text class="sub" x="500" y="99" text-anchor="middle">POST /api/decide · holds the key</text>
+
+  <rect class="box" x="710" y="56" width="240" height="56" rx="8"/>
+  <text class="h" x="830" y="80" text-anchor="middle">OpenRouter → Jev</text>
+  <text class="sub" x="830" y="99" text-anchor="middle">/api/v1/systemone · jev-1.13</text>
+
+  <line class="life" x1="170" y1="112" x2="170" y2="672"/>
+  <line class="life" x1="500" y1="112" x2="500" y2="672"/>
+  <line class="life" x1="830" y1="112" x2="830" y2="672"/>
+
+  <!-- trust boundary -->
+  <line class="trust" x1="335" y1="124" x2="335" y2="672"/>
+  <rect class="bg" x="262" y="121" width="146" height="18"/>
+  <text class="note" x="335" y="134" text-anchor="middle">trust boundary · no key ←</text>
+
+  <!-- local chart -->
+  <rect class="local" x="60" y="148" width="220" height="44" rx="6"/>
+  <text x="170" y="167" text-anchor="middle">compute transits + natal chart</text>
+  <text class="sub" x="170" y="184" text-anchor="middle">astronomy-engine, no network</text>
+
+  <!-- Call 1 -->
+  <rect class="act" x="494" y="222" width="12" height="122"/>
+  <line class="req" x1="170" y1="222" x2="492" y2="222" marker-end="url(#ah)"/>
+  <text class="lbl" x="252" y="214" text-anchor="middle">Call 1 · classify</text>
+  <text class="note" x="420" y="214" text-anchor="middle">state: activity text</text>
+  <text class="note" x="252" y="240" text-anchor="middle">category · sensitivity · vague</text>
+
+  <line class="req" x1="506" y1="262" x2="828" y2="262" marker-end="url(#ah)"/>
+  <text class="lbl" x="665" y="254" text-anchor="middle">+ model, + Bearer key</text>
+
+  <line class="res" x1="828" y1="302" x2="508" y2="302" marker-end="url(#ah)"/>
+  <text class="lbl" x="665" y="294" text-anchor="middle">answers + usage</text>
+  <text class="note" x="665" y="320" text-anchor="middle">957 tokens in · $0.000040</text>
+
+  <line class="res" x1="494" y1="344" x2="172" y2="344" marker-end="url(#ah)"/>
+  <text class="lbl" x="420" y="336" text-anchor="middle">whitelisted reply</text>
+  <text class="note" x="252" y="336" text-anchor="middle">388 ms round trip</text>
+
+  <!-- decision -->
+  <rect class="decide" x="40" y="370" width="260" height="70" rx="8"/>
+  <text class="acc" x="170" y="393" text-anchor="middle">route() · in the browser</text>
+  <text x="170" y="412" text-anchor="middle">recusal, or vague ≥ 0.75 → stop</text>
+  <text x="170" y="430" text-anchor="middle">otherwise → Call 2</text>
+
+  <!-- Call 2 -->
+  <rect class="act" x="494" y="474" width="12" height="122"/>
+  <line class="req" x1="170" y1="474" x2="492" y2="474" marker-end="url(#ah)"/>
+  <text class="lbl" x="252" y="466" text-anchor="middle">Call 2 · verdict</text>
+  <text class="note" x="420" y="466" text-anchor="middle">state: chart facts</text>
+  <text class="note" x="252" y="492" text-anchor="middle">favor · intensity</text>
+
+  <line class="req" x1="506" y1="514" x2="828" y2="514" marker-end="url(#ah)"/>
+  <text class="lbl" x="665" y="506" text-anchor="middle">+ model, + Bearer key</text>
+
+  <line class="res" x1="828" y1="554" x2="508" y2="554" marker-end="url(#ah)"/>
+  <text class="lbl" x="665" y="546" text-anchor="middle">answers + usage</text>
+  <text class="note" x="665" y="572" text-anchor="middle">543 tokens in · $0.000023</text>
+
+  <line class="res" x1="494" y1="596" x2="172" y2="596" marker-end="url(#ah)"/>
+  <text class="lbl" x="420" y="588" text-anchor="middle">whitelisted reply</text>
+  <text class="note" x="252" y="588" text-anchor="middle">338 ms round trip</text>
+
+  <!-- template -->
+  <rect class="local" x="60" y="618" width="220" height="44" rx="6"/>
+  <text x="170" y="637" text-anchor="middle">explain.ts fills a template</text>
+  <text class="sub" x="170" y="654" text-anchor="middle">"… (p = 0.27)."  Firmly 👎</text>
+</svg>

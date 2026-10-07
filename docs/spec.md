@@ -1,4 +1,4 @@
-# Project: Cosmic Oracle — "Should I do this?"
+# Project: Cosmic JEV — "Should I do this?"
 
 A deadpan-funny web app: the user enters their birthdate and an activity, and
 the app returns a thumbs up or down based on *real* planetary positions,

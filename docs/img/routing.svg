@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 400" role="img" aria-label="Call 1's answers decide what happens next, in the browser. Violence toward a person, safety or legal sensitivity always recuses; otherwise a vague score of 0.75 or more asks for detail; only what is left goes on to Call 2 for a verdict. Real captured examples: punch my neighbor recused, do the thing was too vague, work late got a firm thumbs down.">
+  <style>
+    svg { --bg: #ffffff; --fg: #1f2330; --muted: #6b7080; --line: #c9ccd6; --accent: #6d28d9; --accent-bg: #f1ebfd; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg: #14161d; --fg: #e8e9ee; --muted: #9a9fb0; --line: #3a3e4c; --accent: #b79cff; --accent-bg: #2a2140; }
+    }
+    .bg { fill: var(--bg); }
+    .box { fill: var(--bg); stroke: var(--fg); stroke-width: 1.5; }
+    .q { fill: var(--bg); stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: 5 3; }
+    .out { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+    .win { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 2; }
+    .flow { stroke: var(--fg); stroke-width: 1.6; fill: none; }
+    .head { fill: var(--fg); }
+    text { fill: var(--fg); font-size: 13px; }
+    .title { font-size: 18px; font-weight: 700; }
+    .h { font-weight: 700; }
+    .sub { fill: var(--muted); font-size: 12px; }
+    .ex { font-style: italic; font-size: 12.5px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    .yn { fill: var(--muted); font-size: 12px; font-weight: 700; }
+    .acc { fill: var(--accent); font-weight: 700; }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path class="head" d="M0 0 L10 5 L0 10 z"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="950" height="400"/>
+  <text class="title" x="30" y="34">route(): what Call 1's answers decide</text>
+  <text class="sub" x="30" y="54">Runs in the browser between the two calls. Bias is toward recusal: false alarms are cheap.</text>
+
+  <!-- main row y=80..160 -->
+  <rect class="box" x="30" y="80" width="170" height="80" rx="8"/>
+  <text class="h" x="115" y="112" text-anchor="middle">Call 1 answers</text>
+  <text class="sub" x="115" y="132" text-anchor="middle">category · sensitivity</text>
+  <text class="sub" x="115" y="148" text-anchor="middle">vague</text>
+
+  <rect class="q" x="250" y="80" width="220" height="80" rx="8"/>
+  <text class="h" x="360" y="108" text-anchor="middle">sensitivity is</text>
+  <text class="mono" x="360" y="128" text-anchor="middle">violence_person,</text>
+  <text class="mono" x="360" y="146" text-anchor="middle">safety or legal?</text>
+
+  <rect class="q" x="520" y="80" width="160" height="80" rx="8"/>
+  <text class="h" x="600" y="116" text-anchor="middle">vague ≥ 0.75?</text>
+  <text class="sub" x="600" y="136" text-anchor="middle">(raised from 0.6)</text>
+
+  <rect class="win" x="730" y="80" width="200" height="80" rx="8"/>
+  <text class="acc" x="830" y="116" text-anchor="middle">Call 2</text>
+  <text x="830" y="136" text-anchor="middle">favor + intensity</text>
+
+  <line class="flow" x1="200" y1="120" x2="248" y2="120" marker-end="url(#ah)"/>
+  <line class="flow" x1="470" y1="120" x2="518" y2="120" marker-end="url(#ah)"/>
+  <text class="yn" x="494" y="112" text-anchor="middle">no</text>
+  <line class="flow" x1="680" y1="120" x2="728" y2="120" marker-end="url(#ah)"/>
+  <text class="yn" x="704" y="112" text-anchor="middle">no</text>
+
+  <line class="flow" x1="360" y1="160" x2="360" y2="218" marker-end="url(#ah)"/>
+  <text class="yn" x="370" y="194">yes</text>
+  <line class="flow" x1="600" y1="160" x2="600" y2="218" marker-end="url(#ah)"/>
+  <text class="yn" x="610" y="194">yes</text>
+  <line class="flow" x1="830" y1="160" x2="830" y2="218" marker-end="url(#ah)"/>
+
+  <!-- outcomes y=220..370 -->
+  <rect class="out" x="250" y="220" width="220" height="150" rx="8"/>
+  <text class="h" x="266" y="246">Recusal</text>
+  <text class="sub" x="266" y="265">1 call · no verdict, no p shown</text>
+  <text class="ex" x="266" y="298">“Should I punch my neighbor”</text>
+  <text class="mono" x="266" y="320">violence_person 1.00</text>
+  <text class="sub" x="266" y="348">“The stars recommend</text>
+  <text class="sub" x="266" y="363">therapy for this one.”</text>
+
+  <rect class="out" x="520" y="220" width="160" height="150" rx="8"/>
+  <text class="h" x="536" y="246">Ask for detail</text>
+  <text class="sub" x="536" y="265">1 call · no verdict</text>
+  <text class="ex" x="536" y="298">“Should I do</text>
+  <text class="ex" x="536" y="314">the thing”</text>
+  <text class="mono" x="536" y="336">vague 0.93</text>
+
+  <rect class="win" x="730" y="220" width="200" height="150" rx="8"/>
+  <text class="h" x="746" y="246">Verdict 👍 / 👎</text>
+  <text class="sub" x="746" y="265">2 calls</text>
+  <text class="ex" x="746" y="298">“Should I work</text>
+  <text class="ex" x="746" y="314">late tonight”</text>
+  <text class="mono" x="746" y="336">vague 0.69 · Saturn</text>
+  <text class="mono" x="746" y="354">favor 0.27 → Firmly 👎</text>
+</svg>

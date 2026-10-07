@@ -1,5 +1,5 @@
 /**
- * Cosmic Oracle Worker: a thin proxy from the browser to Jev via OpenRouter.
+ * Cosmic JEV Worker: a thin proxy from the browser to Jev via OpenRouter.
  * See docs/jev-openrouter.md for the upstream request/response shapes.
  *
  * Route:  POST /api/decide   body: { state, questions }
